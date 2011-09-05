@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Twitter Pages</title>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+
+<meta name="viewport" content="initial-scale = 1.0,maximum-scale = 1.0,width=device-width" />
+<link href='http://fonts.googleapis.com/css?family=Vollkorn' rel='stylesheet' type='text/css'>
+
+
+<script src="../oni-apollo.js"></script>
+
+</script>
+<script type="text/sjs">
+// Load the @Anywhere API and init with your application id:
+var T = require("apollo:twitter").initAnywhere({id:"hkEsBjNpWsOVKQ2gKyr1kQ"});
+
+
+// show twitter connect button:
+T("#login").connectButton();
+
+// wait until we're connected:
+if (!T.isConnected()) T.waitforEvent("authComplete");
+
+require("apollo:jquery-binding").install();
+$("#login").hide();
+
+// main loop:
+while (1) {
+  waitfor {
+    require('./megazine');
+    hold();
+  }
+  or {
+    waitfor_signout();
+  }
+}
+
+// helper that shows a signout button and blocks until it is clicked
+function waitfor_signout() {
+  try {
+    // Show a signout button and wait for it to be clicked:
+    var signout = $("<a href='#'>Sign out of twitter</a>").appendTo("#logout");
+    var e = signout.$click();
+    e.returnValue = false;
+    e.preventDefault();
+  
+    // Ok, signout button was clicked; sign out, hide button & clear timeline:
+    twttr.anywhere.signOut();
+  }
+  finally {
+    signout.remove();
+    $("#login").show();
+  }
+}
+
+
+</script>
+<style>
+body {
+  -webkit-font-smoothing: antialiased;
+  padding: 30px 30px 30px 15px;
+}
+#timeline {
+  margin: 0 auto;
+}
+
+#timeline .col, #timeline .tweets {
+  width:25%;
+  float:left;
+  overflow:hidden;
+}
+h1 {
+  margin:0 0 0px 0;
+  text-align:center;
+  font: 50px 'Vollkorn';
+}
+.article {
+  padding: 15px 15px 5px 15px;
+  margin-bottom: 30px;
+  display:block;
+}
+h3 {
+  font: 18px 'Vollkorn';
+  font-weight: normal;
+  margin: 0px 0 0 0;
+  line-height:24px;
+}
+h3 a:visited {
+  color: #666; !important;
+}
+.tweets h3 {
+  margin: 15px 0 5px 15px;
+}
+.summary ,.tweet, .btweet {
+  font: 15px serif;
+  font-weight: normal;
+  line-height:20px;
+  color:#222  ;
+}
+.tweet {
+  margin-bottom: 10px;
+  color: #555;
+}
+.tweets {
+  background: #fafafa;
+  margin-left:-1px;
+  border-left: 1px solid #f1f1f1;
+}
+.btweet {
+  padding: 10px 15px 5px 15px;
+  color: #222;
+}
+.article a {
+  color: #111;
+  text-decoration:none;
+}
+.content span{
+  color:#666;
+}
+.user, #about {
+  color: #666;
+  font-family:helvetica,sans-serif;
+  font-size: 13px;
+  margin-bottom:5px;
+}
+.illustration {
+  margin: 5px 0 5px 0;
+  width:100%;
+  height:100px;
+  background-position:50% 50%; 
+  background-size: 100% auto;
+}
+#login,#logout {
+  float:right;
+  margin: 30px;
+}
+#about {
+  display:block;
+  text-align:center;
+  margin: 0px 0 30px 0;
+}
+@media screen and (max-width: 900px) {
+  #timeline .col {
+    width:33%;
+  }
+  #timeline .tweets {
+    width: 100%;
+  }
+}
+</style>
+</head>
+<body>
+
+<h1>The News</h1>
+<div id="about"></div>
+<div id="timeline">
+  <div class="col"></div>
+  <div class="col"></div>
+  <div class="col"></div>
+  <div class="tweets">
+  </div>
+</div>
+<div id="login"></div>
+<div id="logout"></div>
+</body>
+
+</html>
