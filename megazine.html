@@ -15,21 +15,26 @@
 <script type="text/sjs">
 // Load the @Anywhere API and init with your application id:
 var T = require("apollo:twitter").initAnywhere({id:"hkEsBjNpWsOVKQ2gKyr1kQ"});
+var logging = require("apollo:logging");
+var collection = require("apollo:collection");
+logging.setLevel(logging.VERBOSE);
 
-
+var megazine = window.megazine = require('./megazine');
+require("apollo:jquery-binding").install();
 // show twitter connect button:
 T("#login").connectButton();
+$("#loading").hide();
 
 // wait until we're connected:
 if (!T.isConnected()) T.waitforEvent("authComplete");
 
-require("apollo:jquery-binding").install();
 $("#login").hide();
 
 // main loop:
 while (1) {
   waitfor {
-    require('./megazine');
+    logging.warn("loaded!");
+    megazine.run();
     hold();
   }
   or {
@@ -70,6 +75,9 @@ body {
   width:25%;
   float:left;
   overflow:hidden;
+}
+#timeline .col {
+  min-height:10px;
 }
 h1 {
   margin:0 0 0px 0;
@@ -136,6 +144,15 @@ h3 a:visited {
   float:right;
   margin: 30px;
 }
+#loading {
+  width:100%;
+  height:100%;
+  position:absolute;
+  top:0;
+  left:0;
+  background: #eee;
+  text-align:center;
+}
 #about {
   display:block;
   text-align:center;
@@ -153,7 +170,8 @@ h3 a:visited {
 </head>
 <body>
 
-<h1>The News</h1>
+<div id="loading">LOADING...</div>
+<h1></h1>
 <div id="about"></div>
 <div id="timeline">
   <div class="col"></div>
