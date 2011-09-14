@@ -15,10 +15,127 @@ if(logging.isEnabled(logging.VERBOSE)) {
   require("apollo:debug").console({receivelog:false});
 }
 
+var logging = require("apollo:logging");
+var collection = require("apollo:collection");
+
+// the main app controller
+var App = exports.App = function App() {
+  window.app = this;
+  this.loading = true;
+  this.status = {
+    loading:true,
+    connected: false,
+  };
+  this.reset();
+
+  // Load the @Anywhere API and init with your application id:
+  this.twitter = require("apollo:twitter").initAnywhere({id:"hkEsBjNpWsOVKQ2gKyr1kQ"});
+  spawn(this.run());
+};
+
+App.prototype.run = function() {
+  // show twitter connect button:
+  this.twitter("#login").connectButton();
+  while(true) {
+    this.status.connected = this.twitter.isConnected();
+    this.status.loading = false;
+    this.$eval();
+    // wait until we're connected:
+    if (!this.status.connected) this.twitter.waitforEvent("authComplete");
+    this.status.connected = true;
+    this.status.loading = true;
+    this.$eval();
+    waitfor {
+      this.load_tweets();
+      hold();
+    } or {
+      var e = $("#signout").$click();
+      collapse;
+      e.returnValue = false;
+      e.preventDefault();
+      logging.info("sign out button clicked!");
+      twttr.anywhere.signOut();
+      this.reset();
+      this.status.connected = false;
+    }
+  }
+};
+
+App.prototype.reset = function() {
+  this.cols = [[],[],[]];
+  this.tweets = [];
+  this.linklessTweets = [];
+  this.articles = {};
+  this.title="The news";
+  this.about=null;
+  this.status.unprocessedTweets = 0;
+  this.runner = null;
+};
+
+App.prototype.load_tweets = function() {
+  this.title = "The "+(date.getHours()||12)+" O'Clock News";
+  var user = this.twitter.call("users/show", {user_id: this.twitter.currentUser.id});
+  this.about = "The twitter links of " + user.name + " on " + dow[date.getDay()];
+
+  waitfor (var tweets) { this.twitter.User.current().homeTimeline(resume); }
+  this.tweets = tweets.array;
+
+  logging.verbose("all tweets: ", null, this.tweets);
+
+  this.status.unprocessedTweets += this.tweets.length;
+  c.par.each(this.tweets, this.processTweet, this);
+};
+
+App.prototype.processTweet = function(tweet) {
+  (function() {
+    logging.debug("processing tweet: ",null, tweet);
+    var link = /(https?:\/\/[^ ]+)/g;
+    var links = tweet.text.match(link);
+    tweet.name = tweet.user.name;
+
+    if(!(links && links.length)) {
+      this.linklessTweets.push(tweet);
+      return;
+    }
+
+    var url = links[0];
+
+    // expand URL if needed
+    url = getExpandedURL(url);
+    
+    if (!this.articles[url]) {
+      // create and load in two steps, since the load step is blocking
+      // and we want to make sure this.articles[url] is set immediately
+      var article = this.articles[url] = new Article(url, tweet, this);
+      article.loadContent();
+      this.showArticle(article);
+    } else {
+      // article already exists; just add this tweet to its references
+      this.articles[url].addTweet(tweet);
+    }
+  }).call(this);
+  this.status.unprocessedTweets--;
+  this.status.loading = false;
+  this.$root.$eval();
+};
+
+App.prototype.showArticle = function(article) {
+  //TODO: this is a bit hacky - inspecting the HTML output to see where articles
+  // should be distributed
+  logging.info("Showing article: " + article, null, article);
+  var columns = $('.col');
+  var columnHeights = columns.map(function() { return $(this).height() }).get();
+  var minColumnHeight = Math.min.apply(Math, columnHeights);
+  var minColumnIndex = columnHeights.indexOf(minColumnHeight);
+  this.cols[minColumnIndex].push(article);
+  this.$root.$eval();
+};
+
 // attach a rate limited version of `fn` to `fn.rateLimited`
 function rateLimit(fn, rate) {
   fn.rateLimited = cutil.makeRateLimitedFunction(fn, rate);
 };
+
 
 var getExpandedURL = (function() {
   var cache = {};
@@ -41,28 +158,6 @@ var expandUrl = exports.expandUrl = function(url) {
   return data['long-url'];
 }
 rateLimit(expandUrl, 4);
-
-function processTweet(tweet) {
-  var link = /(https?:\/\/[^ ]+)/g;
-  var links = tweet.text.match(link);
-  tweet.name = tweet.user.name;
-
-  if(!(links && links.length)) {
-    this.linklessTweets.push(tweet);
-    return;
-  }
-
-  var url = links[0];
-
-  // expand URL if needed
-  url = getExpandedURL(url);
-  
-  if (!this.articles[url]) {
-    this.articles[url] = {tweets: []};
-  }
-
-  this.articles[url].tweets.push(tweet);
-};
 
 var getURLContents = exports.getURLContents = function getURLContents(url) {
   var xpath = "//title[1]|//img[@src]|//meta[@name='description']|//script[contains(.,'hqdefault')]";
@@ -157,157 +252,84 @@ function isImageService(url) {
   return imgServiceDomains.indexOf(domain) !== -1;
 };
 
-function processArticle(article, url) {
-  logging.debug("Processing article: {url}", {url:url});
+// -------------------- models --------------------
 
-  var contents = getURLContents.rateLimited(url);
+var Article = exports.Article = function(url, tweet) {
+  this.url = url;
+  this.tweets = [tweet];
+};
+
+Article.prototype.addTweet = function(tweet) {
+  this.tweets.push(tweet);
+};
+
+Article.prototype.loadContent = function() {
+  logging.debug("Processing article: {url}", this);
+  this.heading = {};
+
+  var contents = getURLContents.rateLimited(this.url);
+
   if (!contents) {
-    logging.debug("no contents found for url {url}", {url:url});
-    return null;
+    logging.debug("no contents found for article:" + this);
+    this.heading.text = this.url;
+    return;
   }
   
-  var result = new Article(url, contents, article.tweets);
-  logging.info("processed article: ",null, result);
-  return result;
-};
-
-function insertArticle(article) {
-  logging.debug("inserting article: {title}",article,article);
-  var cols = $("#timeline div.col");
-  var col;
-
-  $.each(cols, function (i, c) {
-    if (!col || $(c).height() < col.height()) {
-      col = $(c);
-    }
-  });
-
-  $(col).append(article.toHtml());
-};
-
-exports.run = function() {
-  $("h1").html("The "+(date.getHours()||12)+" O'Clock News");
-
-  var user = T.call("users/show", {user_id: T.currentUser.id});
-
-  $("#about").html("The twitter links of " + user.name + " on " + dow[date.getDay()]);
-
-  waitfor (var tweets) { T.User.current().homeTimeline(resume); }
-
-
-  logging.verbose("all tweets: ", null, tweets);
-
-  var context = {
-    articles: {},
-    linklessTweets: []
-  };
-
-  c.par.each(tweets.array, processTweet, context);
-
-  $(".tweets").html("<h3>Linkless updates</h3>");
-  c.each(context.linklessTweets, function(tweet) {
-    $(".tweets").append(s("<div class='btweet'>{text}<div class='user'>by {name}</div></div>", tweet));
-  });
-
-  var pageCheck = {};
-
-  context.articles = c.par.map(context.articles, processArticle);
-  exports.articles = context.articles; //DEBUG
-  // failed summaries return null, so strip them:
-  context.articles = c.filter(context.articles, c.identity);
-
-  c.each(context.articles, insertArticle);
-};
-
-
-// -------------------- models --------------------
-function Image(src, imgService) {
-  this.src = src;
-  this.imgService = imgService;
-  this.height = imgService ? 200 : null;
-};
-Image.prototype.toString = function() { return s("<Image: {src}>", this); };
-Image.prototype.toHtml = function() {
-  var style="background-image:url({src});";
-  if(this.height) {
-    style += "height:{height};";
-  };
-  return s("<div style='" + style + "' class='illustration'></div>", this);
-};
-
-
-
-function Article(url, contents, tweets) {
   this.contents = contents;
-  this.url = url;
-  this.hasTitle = !!this.contents.title;
   this.img = extractImage(this.contents, this.url);
-  this.tweets = tweets;
+
   if(this.img && this.img.imgService) {
-    this.heading = this.imageHeading();
-    this.contextImage = "";
+    this.heading.image = img.src;
+    this.contextImage = null;
+    this.tweet = this.tweetText();
   } else {
-    this.heading = this.textHeading();
-    this.contextImage = this.imgHtml();
+    this.contextImage = this.img;
+    var titleAndTweet = this.getTitleAndTweet();
+    this.heading.text = titleAndTweet[0];
+    this.tweet = titleAndTweet[1];
   }
-}
+  this.summary = this.getSummary();
+  this.tweet = this.tweetText();
+};
 Article.prototype.toString = function() {
   return s("<Article from: {url}>", this);
 };
-Article.prototype.toHtml = function() {
-  var parts = [
-    this.heading,
-    this.source(),
-    this.contextImage,
-    this.hasTitle ? this.tweet() : null,
-    this.summary()
-  ];
+Article.prototype.tweetText = function() { return this.tweets[0].text; }
 
-  return "<div class='article'><div class='inner'>" + parts.join("\n") + "</div></div>";
-};
-
-Article.prototype.imageHeading = function() {
-  return s("<a href='{url}'><img src='{imgUrl}' class='heading'/></a>", {url: this.url, imgUrl:this.img.src});
-};
-
-Article.prototype.textHeading = function() {
-  return s("<h3><a href='{url}'>{title}</a></h3>", this);
-};
-
-Article.prototype.imgHtml = function() {
-  if(!this.img) return;
-  return this.img.toHtml();
-};
-
-Article.prototype.title = function() {
-  if(this.hasTitle) {
-    return this.contents.title;
+Article.prototype.getTitleAndTweet = function() {
+  var title = this.contents.title;
+  var tweet = this.tweetText();
+  if(!title) {
+    // use tweet as title, but don't show anything for tweet text
+    title = tweet;
+    tweet = null;
   }
-  return this.tweetText();
+  return [title, tweet];
 };
 
-Article.prototype.summary = function() {
-  if(!(this.contents.meta && this.contents.meta.content)) return "";
-  var summaryText = this.contents.meta.content;
-  var summaryStyle = '';
-  if (summaryText > 300) {
-    summaryStyle = "text-align:justify";
+Article.prototype.getSummary = function() {
+  if(!(this.contents.meta && this.contents.meta.content)) return;
+  var summary = {
+    text: this.contents.meta.content,
+    style: {}
+  };
+
+  if (summary.text.length > 300) {
+    summary.style['text-align'] = "justify";
   }
-  return "<div class='summary' style='" + summaryStyle + "'>" + summaryText + "</div>";
+  return summary;
 };
 
-Article.prototype.tweetText = function() {
-  return this.tweets[0].text;
-};
 
-Article.prototype.tweet = function() {
-  return "<div class='tweet'>" + this.tweetText() +"</div>";
+function Image(src, imgService) {
+  this.src = src;
+  this.imgService = imgService;
+  this.style = {
+    'background-image': s('url({src})', this),
+  };
+  if(imgService) {
+    this.style.height = 200;
+  }
 };
-
-Article.prototype.source = function() {
-  var getUser = function(tweet) { return tweet.user.name; };
-  var users = c.map(this.tweets, getUser).join(", ");
-
-  return "<div class='user'>by " + users + "</div>";
-};
+Image.prototype.toString = function() { return s("<Image: {src}>", this); };
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html xmlns:ng="http://angularjs.org">
 <head>
 <title>Twitter Pages</title>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -10,56 +10,18 @@
 
 
 <script src="../oni-apollo.js"></script>
+<script src="angular-0.9.19.min.js"></script>
 
 </script>
 <script type="text/sjs">
-// Load the @Anywhere API and init with your application id:
-var T = require("apollo:twitter").initAnywhere({id:"hkEsBjNpWsOVKQ2gKyr1kQ"});
 var logging = require("apollo:logging");
-var collection = require("apollo:collection");
 logging.setLevel(logging.DEBUG);
+require("apollo:jquery-binding").install();
 
 var megazine = window.megazine = require('./megazine');
-require("apollo:jquery-binding").install();
-// show twitter connect button:
-T("#login").connectButton();
-$("#loading").hide();
+logging.info("window.megazine = {megazine}", window)
 
-// wait until we're connected:
-if (!T.isConnected()) T.waitforEvent("authComplete");
-
-$("#login").hide();
-
-// main loop:
-while (1) {
-  waitfor {
-    logging.warn("loaded!");
-    megazine.run();
-    hold();
-  }
-  or {
-    waitfor_signout();
-  }
-}
-
-// helper that shows a signout button and blocks until it is clicked
-function waitfor_signout() {
-  try {
-    // Show a signout button and wait for it to be clicked:
-    var signout = $("<a href='#'>Sign out of twitter</a>").appendTo("#logout");
-    var e = signout.$click();
-    e.returnValue = false;
-    e.preventDefault();
-  
-    // Ok, signout button was clicked; sign out, hide button & clear timeline:
-    twttr.anywhere.signOut();
-  }
-  finally {
-    signout.remove();
-    $("#login").show();
-  }
-}
-
+angular.compile(document)();
 
 </script>
 <style>
@@ -130,7 +92,7 @@ h3 a:visited {
   padding: 10px 15px 5px 15px;
   color: #222;
 }
-.article a {
+.article a,.btweet a {
   color: #111;
   text-decoration:none;
 }
@@ -154,10 +116,11 @@ h3 a:visited {
   float:right;
   margin: 30px;
 }
-#loading {
+.loading {
   width:100%;
   height:100%;
   position:absolute;
+  display:fixed;
   top:0;
   left:0;
   background: #eee;
@@ -167,6 +130,11 @@ h3 a:visited {
   display:block;
   text-align:center;
   margin: 0px 0 30px 0;
+}
+#unprocessedTweets {
+  position:fixed;
+  top:0;
+  right:0;
 }
 @media screen and (max-width: 900px) {
   #timeline .col {
@@ -180,18 +148,54 @@ h3 a:visited {
 </head>
 <body>
 
-<div id="loading">LOADING...</div>
-<h1></h1>
-<div id="about"></div>
-<div id="timeline">
-  <div class="col"></div>
-  <div class="col"></div>
-  <div class="col"></div>
-  <div class="tweets">
+<div ng:controller="megazine.App">
+
+  <!-- <pre>STATUS: {{status}}</pre> -->
+
+  <div id="loading" class="loading" ng:show="status.loading">LOADING...</div>
+  <h1>{{title}}</h1>
+  <div id="about">{{about}}</div>
+  <h3 id="unprocessedTweets" style="display:none;" ng:show="status.unprocessedTweets">loading {{status.unprocessedTweets}} tweets...</h3>
+  <div id="timeline">
+    <div class="col" ng:repeat="col in cols">
+      <div class="article" ng:repeat="article in col">
+        <a ng:href="{{article.url}}">
+          <h3 ng:show="article.heading.text">{{article.heading.text}}</h3>
+          <img ng:show="article.heading.image" ng:src="{{article.heading.image}}"/>
+        </a>
+        <div class="user">by
+          <span ng:repeat="tweet in article.tweets">
+            <a ng:href="http://twitter.com/#!/{{tweet.user.screenName}}">{{tweet.user.name}}</a><span ng:hide="position = 'last'">,</span>
+          </span>
+        </div>
+
+        <div ng:show="article.contextImage"
+          class="illustration"
+          ng:style="article.contextImage.style"></div>
+        
+        <div class="tweet" ng:show="article.tweet">{{article.tweet}}</div>
+
+        <div class="summary"
+          ng:show="article.summary"
+          ng:style="article.summary.style">
+          {{article.summary.text}}
+        </div>
+      </div>
+    </div>
+    <div class="tweets">
+      <div class='btweet' ng:repeat="tweet in linklessTweets">
+        {{tweet.text}}
+        <div class='user'>by <a ng:href="http://twitter.com/#!/{{tweet.user.screenName}}">{{tweet.user.name}}</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="login" ng:hide="status.connected"></div>
+  <div id="logout" ng:show="status.connected">
+    <a id="signout" href="#">Sign out of twitter</a>
   </div>
 </div>
-<div id="login"></div>
-<div id="logout"></div>
+
 </body>
 
 </html>
