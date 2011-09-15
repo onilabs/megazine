@@ -161,10 +161,9 @@ App.prototype.processTweet = function(tweet) {
 };
 
 App.prototype.showArticle = function(article) {
-  //TODO: this is a bit hacky - inspecting the HTML output to see where articles
-  // should be distributed
   logging.info("Showing article: " + article, null, article);
-  var columns = $('.col');
+  // get the column with the smallest displyed height
+  var columns = $('.col', this.$element);
   var columnHeights = columns.map(function() { return $(this).height() }).get();
   var minColumnHeight = Math.min.apply(Math, columnHeights);
   var minColumnIndex = columnHeights.indexOf(minColumnHeight);
