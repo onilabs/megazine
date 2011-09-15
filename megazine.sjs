@@ -6,10 +6,32 @@ var yql = require("apollo:yql");
 var s = require("apollo:common").supplant;
 var cutil = require('apollo:cutil');
 var dom = require('apollo:dom');
-var date = new Date();
 var dow = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 var c = require('apollo:collection');
 var imgServiceDomains = ["twitpic.com", "yfrog.com"];
+var underscore = require("./underscore.js");
+
+// TODO: move into cutil?
+function Event() {
+  this.clear();
+};
+Event.prototype.wait = function wait() {
+  if (this.isSet) return;
+  waitfor() {
+    this.waiting.push(resume);
+  }
+};
+Event.prototype.set = function set() {
+  if(this.isSet) return; // noop
+  var waiting = this.waiting;
+  this.waiting = null;
+  this.isSet = true;
+  spawn(c.par.map(waiting, function(resume) { resume(); }));
+};
+Event.prototype.clear = function clear() {
+  this.isSet = false;
+  this.waiting = [];
+};
 
 if(logging.isEnabled(logging.VERBOSE)) {
   require("apollo:debug").console({receivelog:false});
@@ -46,13 +68,12 @@ App.prototype.run = function() {
     this.status.loading = true;
     this.$eval();
     waitfor {
-      this.load_tweets();
-      hold();
+      this.fetchTweetLoop();
     } or {
-      var e = $("#signout").$click();
+      this.processTweetLoop();
+    } or {
+      this.signoutEvent.wait();
       collapse;
-      e.returnValue = false;
-      e.preventDefault();
       logging.info("sign out button clicked!");
       twttr.anywhere.signOut();
       this.reset();
@@ -68,55 +89,75 @@ App.prototype.reset = function() {
   this.articles = {};
   this.title="The news";
   this.about=null;
-  this.status.unprocessedTweets = 0;
+  this.unprocessedTweets = new cutil.Queue();
   this.runner = null;
+  this.signoutEvent = new Event();
 };
 
-App.prototype.load_tweets = function() {
-  this.title = "The "+(date.getHours()||12)+" O'Clock News";
-  var user = this.twitter.call("users/show", {user_id: this.twitter.currentUser.id});
-  this.about = "The twitter links of " + user.name + " on " + dow[date.getDay()];
+App.prototype.triggerSignout = function() {
+  this.signoutEvent.set();
+};
 
-  waitfor (var tweets) { this.twitter.User.current().homeTimeline(resume); }
-  this.tweets = tweets.array;
+App.prototype.fetchTweetLoop = function() {
+  while(true) {
+    var date = new Date();
+    this.title = "The "+(date.getHours()||12)+" O'Clock News";
+    var user = this.twitter.call("users/show", {user_id: this.twitter.currentUser.id});
+    this.about = "The twitter links of " + user.name + " on " + dow[date.getDay()];
 
-  logging.verbose("all tweets: ", null, this.tweets);
+    waitfor (var tweets) { this.twitter.User.current().homeTimeline(resume); }
+    tweets = tweets.array;
+    var existingIds = underscore.pluck(this.tweets, 'id');
+    var newIds = underscore.pluck(tweets, 'id');
 
-  this.status.unprocessedTweets += this.tweets.length;
-  c.par.each(this.tweets, this.processTweet, this);
+    newIds = underscore.difference(newIds, existingIds);
+
+    var newTweets = underscore.select(tweets, function(t) { return underscore.include(newIds, t.id); });
+    this.tweets = this.tweets.concat(newTweets);
+
+    logging.debug("adding {length} new tweets to queue", newTweets);
+    c.each(newTweets, this.unprocessedTweets.put, this.unprocessedTweets);
+    this.$eval();
+
+    hold(1000 * 60 * 2);
+  }
+};
+
+App.prototype.processTweetLoop = function() {
+  while(true) {
+    this.processTweet(this.unprocessedTweets.get());
+    if(this.status.loading) this.status.loading = false;
+    this.$root.$eval();
+    hold(1);// let UI update
+  }
 };
 
 App.prototype.processTweet = function(tweet) {
-  (function() {
-    logging.debug("processing tweet: ",null, tweet);
-    var link = /(https?:\/\/[^ ]+)/g;
-    var links = tweet.text.match(link);
-    tweet.name = tweet.user.name;
+  logging.debug("processing tweet: ",null, tweet);
+  var link = /(https?:\/\/[^ ]+)/g;
+  var links = tweet.text.match(link);
+  tweet.name = tweet.user.name;
 
-    if(!(links && links.length)) {
-      this.linklessTweets.push(tweet);
-      return;
-    }
+  if(!(links && links.length)) {
+    this.linklessTweets.push(tweet);
+    return;
+  }
 
-    var url = links[0];
+  var url = links[0];
 
-    // expand URL if needed
-    url = getExpandedURL(url);
-    
-    if (!this.articles[url]) {
-      // create and load in two steps, since the load step is blocking
-      // and we want to make sure this.articles[url] is set immediately
-      var article = this.articles[url] = new Article(url, tweet, this);
-      article.loadContent();
-      this.showArticle(article);
-    } else {
-      // article already exists; just add this tweet to its references
-      this.articles[url].addTweet(tweet);
-    }
-  }).call(this);
-  this.status.unprocessedTweets--;
-  this.status.loading = false;
-  this.$root.$eval();
+  // expand URL if needed
+  url = getExpandedURL(url);
+  
+  if (!this.articles[url]) {
+    // create and load in two steps, since the load step is blocking
+    // and we want to make sure this.articles[url] is set immediately
+    var article = this.articles[url] = new Article(url, tweet, this);
+    article.loadContent();
+    this.showArticle(article);
+  } else {
+    // article already exists; just add this tweet to its references
+    this.articles[url].addTweet(tweet);
+  }
 };
 
 App.prototype.showArticle = function(article) {
@@ -131,11 +172,16 @@ App.prototype.showArticle = function(article) {
   this.$root.$eval();
 };
 
+
+
+// -------------------- URL / Image helper functions --------------------
+
+
+
 // attach a rate limited version of `fn` to `fn.rateLimited`
 function rateLimit(fn, rate) {
   fn.rateLimited = cutil.makeRateLimitedFunction(fn, rate);
 };
-
 
 var getExpandedURL = (function() {
   var cache = {};
@@ -252,7 +298,7 @@ function isImageService(url) {
   return imgServiceDomains.indexOf(domain) !== -1;
 };
 
-// -------------------- models --------------------
+// -------------------- Article / Image objects --------------------
 
 var Article = exports.Article = function(url, tweet) {
   this.url = url;

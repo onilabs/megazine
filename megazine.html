@@ -152,33 +152,35 @@ h3 a:visited {
 
   <!-- <pre>STATUS: {{status}}</pre> -->
 
-  <div id="loading" class="loading" ng:show="status.loading">LOADING...</div>
+<div id="loading" class="loading" ng:show="status.loading"><div style="margin-top:20%">LOADING...</div></div>
   <h1>{{title}}</h1>
   <div id="about">{{about}}</div>
-  <h3 id="unprocessedTweets" style="display:none;" ng:show="status.unprocessedTweets">loading {{status.unprocessedTweets}} tweets...</h3>
+  <h3 id="unprocessedTweets" style="display:none;" ng:show="unprocessedTweets.count()">loading {{unprocessedTweets.count()}} tweets...</h3>
   <div id="timeline">
     <div class="col" ng:repeat="col in cols">
       <div class="article" ng:repeat="article in col">
-        <a ng:href="{{article.url}}">
-          <h3 ng:show="article.heading.text">{{article.heading.text}}</h3>
-          <img ng:show="article.heading.image" ng:src="{{article.heading.image}}"/>
-        </a>
-        <div class="user">by
-          <span ng:repeat="tweet in article.tweets">
-            <a ng:href="http://twitter.com/#!/{{tweet.user.screenName}}">{{tweet.user.name}}</a><span ng:hide="position = 'last'">,</span>
-          </span>
-        </div>
+        <div class="inner">
+          <a ng:href="{{article.url}}">
+            <h3 ng:show="article.heading.text">{{article.heading.text}}</h3>
+            <img ng:show="article.heading.image" ng:src="{{article.heading.image}}"/>
+          </a>
+          <div class="user">by
+            <span ng:repeat="tweet in article.tweets">
+              <a ng:href="http://twitter.com/#!/{{tweet.user.screenName}}">{{tweet.user.name}}</a><span ng:hide="position = 'last'">,</span>
+            </span>
+          </div>
 
-        <div ng:show="article.contextImage"
-          class="illustration"
-          ng:style="article.contextImage.style"></div>
-        
-        <div class="tweet" ng:show="article.tweet">{{article.tweet}}</div>
+          <div ng:show="article.contextImage"
+            class="illustration"
+            ng:style="article.contextImage.style"></div>
+          
+          <div class="tweet" ng:show="article.tweet">{{article.tweet}}</div>
 
-        <div class="summary"
-          ng:show="article.summary"
-          ng:style="article.summary.style">
-          {{article.summary.text}}
+          <div class="summary"
+            ng:show="article.summary"
+            ng:style="article.summary.style">
+            {{article.summary.text}}
+          </div>
         </div>
       </div>
     </div>
@@ -192,7 +194,7 @@ h3 a:visited {
 
   <div id="login" ng:hide="status.connected"></div>
   <div id="logout" ng:show="status.connected">
-    <a id="signout" href="#">Sign out of twitter</a>
+    <button ng:click="triggerSignout()">Sign out of twitter</a>
   </div>
 </div>
 
