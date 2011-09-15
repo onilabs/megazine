@@ -152,7 +152,7 @@ h3 a:visited {
 
   <!-- <pre>STATUS: {{status}}</pre> -->
 
-<div id="loading" class="loading" ng:show="news.loading"><div style="margin-top:20%">LOADING...</div></div>
+<div id="loading" class="loading" ng:show="(!news) || news.loading"><div style="margin-top:20%">LOADING...</div></div>
   <h1>{{panel.title}}</h1>
   <div id="about">{{panel.about}}</div>
   <h3 id="unprocessedItems" style="display:none;" ng:show="news.unprocessedItems">loading {{news.unprocessedItems}} items...</h3>

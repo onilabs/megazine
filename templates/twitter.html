@@ -8,7 +8,7 @@
   </div>
 </div>
 
-<div id="login" ng:hide="status.connected"></div>
-<div id="logout" ng:show="status.connected">
+<div id="login" ng:hide="connected"></div>
+<div id="logout" ng:show="connected">
   <button ng:click="triggerSignout()">Sign out of twitter</a>
 </div>

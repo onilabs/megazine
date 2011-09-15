@@ -12,28 +12,6 @@ var c = require('apollo:collection');
 var imgServiceDomains = ["twitpic.com", "yfrog.com"];
 var underscore = require("./underscore.js");
 
-// TODO: move into cutil?
-function Event() {
-  this.clear();
-};
-Event.prototype.wait = function wait() {
-  if (this.isSet) return;
-  waitfor() {
-    this.waiting.push(resume);
-  }
-};
-Event.prototype.set = function set() {
-  if(this.isSet) return; // noop
-  var waiting = this.waiting;
-  this.waiting = null;
-  this.isSet = true;
-  spawn(c.par.map(waiting, function(resume) { resume(); }));
-};
-Event.prototype.clear = function clear() {
-  this.isSet = false;
-  this.waiting = [];
-};
-
 if(logging.isEnabled(logging.VERBOSE)) {
   require("apollo:debug").console({receivelog:false});
 }
@@ -163,11 +141,11 @@ Twitter.prototype._init = function() {
   // show twitter connect button:
   this.twitter("#login").connectButton();
   this.loading = false;
-  this.super._init();
+  this.super._init.call(this);
 };
 Twitter.prototype.reset = function() {
   this.columns = [[],[],[]];
-  this.signoutEvent = new Event();
+  this.signoutEvent = new cutil.Event();
   this.linklessTweets = [];
   this.super.reset.call(this);
 };
@@ -201,10 +179,11 @@ Twitter.prototype.loadNewItems = function() {
   this.about = "The twitter links of " + user.name + " on " + dow[date.getDay()];
 
   waitfor (var tweets) { this.twitter.User.current().homeTimeline(resume); }
-  var newTweets = this.addNewItems(tweets);
+  var newTweets = this.addNewItems(tweets.array);
 
+  logging.debug("all new tweets = ",null,newTweets);
   c.par.map(newTweets, function(tweet) {
-    using(workItem()) {
+    using(this.workItem()) {
       this.processTweet(tweet);
     }
   }, this);
@@ -410,7 +389,7 @@ Article.prototype.loadContent = function() {
   this.img = extractImage(this.contents, this.url);
 
   if(this.img && this.img.imgService) {
-    this.heading.image = img.src;
+    this.heading.image = this.img.src;
     this.contextImage = null;
   } else {
     this.contextImage = this.img;
