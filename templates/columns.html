@@ -1,0 +1,23 @@
+<div class="col" ng:repeat="col in columns">
+  <div class="article" ng:repeat="article in col">
+    <div class="inner">
+      <a ng:href="{{article.url}}">
+        <h3 ng:show="article.heading.text">{{article.heading.text}}</h3>
+        <img ng:show="article.heading.image" ng:src="{{article.heading.image}}"/>
+      </a>
+      <div class="user">by {{article.userList()}}</div>
+
+      <div ng:show="article.contextImage"
+        class="illustration"
+        ng:style="article.contextImage.style"></div>
+      
+      <div class="tweet" ng:show="article.pointerText">{{article.pointerText}}</div>
+
+      <div class="summary"
+        ng:show="article.summary"
+        ng:style="article.summary.style">
+        {{article.summary.text}}
+      </div>
+    </div>
+  </div>
+</div>

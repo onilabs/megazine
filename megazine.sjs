@@ -3,7 +3,8 @@ var logging = require("apollo:logging");
 
 var http = require('apollo:http');
 var yql = require("apollo:yql");
-var s = require("apollo:common").supplant;
+var common = require("apollo:common");
+var s = common.supplant;
 var cutil = require('apollo:cutil');
 var dom = require('apollo:dom');
 var dow = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -41,98 +42,200 @@ var logging = require("apollo:logging");
 var collection = require("apollo:collection");
 
 // the main app controller
-var App = exports.App = function App() {
-  window.app = this;
-  this.loading = true;
-  this.status = {
-    loading:true,
-    connected: false,
-  };
-  this.reset();
+var App = exports.App = function App(route) {
+  route.when('/twitter', {controller: Twitter, template: "templates/twitter.html"});
+  route.when('/hackernews', {controller: HackerNews, template: "templates/hackernews.html"});
+  // route.otherwise({redirectTo: '/hackernews'});
 
-  // Load the @Anywhere API and init with your application id:
-  this.twitter = require("apollo:twitter").initAnywhere({id:"hkEsBjNpWsOVKQ2gKyr1kQ"});
-  spawn(this.run());
+  var currentStrata;
+  while (true) {
+    try {
+      logging.debug("before first route");
+      waitfor() { route.onChange(resume); }
+      logging.debug("after first route");
+      if(currentStrata) { currentStrata.abort(); currentStrata = null; }
+      if(!route.current || !route.current.scope) {
+        continue;
+      }
+      this.news = route.current.scope;
+
+      // scope seems to be initialized right after this callback, so we need a delay:
+      hold(200);
+      logging.debug("after first route (hold)");
+      this.news._init();
+      currentStrata = spawn(this.news.run());
+    } catch (e) {
+      logging.error("Error!", null, e);
+    }
+  };
 };
 
-App.prototype.run = function() {
+App.$inject=['$route'];
+
+var newsFunctions = {
+  // methods common across all news sources (twitter, hackernews, ...)
+  reset: function() {
+    this.articles = {};
+    this.title = 'The news';
+    this.about=null;
+    this.unprocessedItems = 0;
+    this.items = [];
+    this.redraw();
+  },
+
+  _init: function() { this.reset(); },
+
+  run: function() {
+    while(true) {
+      this.loadNewItems()
+      hold(1000 * 60 * 2); // sleep 2 minutes
+    }
+  },
+
+  workItem: function() {
+    // context manager to keep track of the number of currently-executing blocking tasks
+    var self = this;
+    self.unprocessedItems++;
+    return {
+      __finally__: function() {
+        self.unprocessedItems--;
+        logging.debug("unprocessed items decremented to " + self.unprocessedItems);
+        self.redraw();
+      }
+    };
+  },
+
+  addNewItems: function(newItems, idProp){
+    idProp = idProp || 'id';
+    var existingItems = this.items;
+    var existingIds = underscore.pluck(existingItems, idProp);
+    var newIds = underscore.pluck(newItems, idProp);
+
+    newIds = underscore.difference(newIds, existingIds);
+    newItems = underscore.select(newItems, function(t) { return underscore.include(newIds, t.id); });
+    this.items = existingItems.concat(newItems);
+    return newItems;
+  },
+
+  processArticle: function(url, user, text) {
+    if (!this.articles[url]) {
+      // create and load in two steps, since the load step is blocking
+      // and we want to make sure this.articles[url] is set immediately
+      var article = this.articles[url] = new Article(url, user, text);
+      article.loadContent();
+      this.showArticle(article);
+    } else {
+      // article already exists; just add this user to its references
+      this.articles[url].addUser(user);
+    }
+    this.redraw();
+  },
+
+  redraw: function() {
+    logging.debug("in redraw(), this = ", null, this);
+    if(!this.$root) return; // XX why does this happen?
+    this.$root.$eval();
+    hold(1);// let UI update
+  },
+
+  showArticle: function(article) {
+    logging.info("Showing article: " + article, null, article);
+    logging.debug("columns = ", null, this.columns);
+    // get the column with the smallest displyed height
+    var columns = $('.col', this.$element);
+    var columnHeights = columns.map(function() { return $(this).height() }).get();
+    var minColumnHeight = Math.min.apply(Math, columnHeights);
+    var minColumnIndex = columnHeights.indexOf(minColumnHeight);
+    this.columns[minColumnIndex].push(article);
+    this.redraw();
+  }
+
+};
+
+var Twitter = exports.Twitter = function Twitter() {};
+
+Twitter.prototype = common.mergeSettings(newsFunctions, {super: newsFunctions});
+Twitter.prototype._init = function() {
+  logging.info("twitter initializing");
+  this.loading = true;
+  // Load the @Anywhere API and init with your application id:
+  this.twitter = require("apollo:twitter").initAnywhere({id:"hkEsBjNpWsOVKQ2gKyr1kQ"});
   // show twitter connect button:
   this.twitter("#login").connectButton();
+  this.loading = false;
+  this.super._init();
+};
+Twitter.prototype.reset = function() {
+  this.columns = [[],[],[]];
+  this.signoutEvent = new Event();
+  this.linklessTweets = [];
+  this.super.reset.call(this);
+};
+
+var HackerNews = exports.HackerNews = function HackerNews() {}
+HackerNews.prototype = common.mergeSettings(newsFunctions, {super: newsFunctions});
+
+HackerNews.prototype.reset = function() {
+  this.columns = [[],[],[],[]];
+  this.super.reset.call(this);
+};
+HackerNews.prototype.loadNewItems = function() {
+  var date = new Date();
+  this.title = "The "+(date.getHours()||12)+" O'Clock News";
+  this.about = "The hackernews links on " + dow[date.getDay()];
+
+  var items = http.jsonp('http://api.ihackernews.com/page', {query: {format:'jsonp'}}).items;
+  var newItems = this.addNewItems(items);
+  c.par.map(newItems, function(item) {
+    using(this.workItem()) {
+      logging.debug("hackernws item: ",null, item);
+      this.processArticle(item.url, item.postedBy, item.title);
+    }
+  }, this);
+};
+
+Twitter.prototype.loadNewItems = function() {
+  var date = new Date();
+  this.title = "The "+(date.getHours()||12)+" O'Clock News";
+  var user = this.twitter.call("users/show", {user_id: this.twitter.currentUser.id});
+  this.about = "The twitter links of " + user.name + " on " + dow[date.getDay()];
+
+  waitfor (var tweets) { this.twitter.User.current().homeTimeline(resume); }
+  var newTweets = this.addNewItems(tweets);
+
+  c.par.map(newTweets, function(tweet) {
+    using(workItem()) {
+      this.processTweet(tweet);
+    }
+  }, this);
+};
+
+Twitter.prototype.run = function() {
   while(true) {
-    this.status.connected = this.twitter.isConnected();
-    this.status.loading = false;
-    this.$eval();
+    this.connected = this.twitter.isConnected();
+    this.redraw();
     // wait until we're connected:
-    if (!this.status.connected) this.twitter.waitforEvent("authComplete");
-    this.status.connected = true;
-    this.status.loading = true;
-    this.$eval();
+    if (!this.connected) this.twitter.waitforEvent("authComplete");
+    this.connected = true;
+    this.redraw(true);
     waitfor {
-      this.fetchTweetLoop();
-    } or {
-      this.processTweetLoop();
+      this.super.run.call(this);
     } or {
       this.signoutEvent.wait();
       collapse;
       logging.info("sign out button clicked!");
       twttr.anywhere.signOut();
       this.reset();
-      this.status.connected = false;
+      this.connected = false;
     }
   }
 };
 
-App.prototype.reset = function() {
-  this.cols = [[],[],[]];
-  this.tweets = [];
-  this.linklessTweets = [];
-  this.articles = {};
-  this.title="The news";
-  this.about=null;
-  this.unprocessedTweets = new cutil.Queue();
-  this.runner = null;
-  this.signoutEvent = new Event();
-};
-
-App.prototype.triggerSignout = function() {
+Twitter.prototype.triggerSignout = function() {
   this.signoutEvent.set();
 };
 
-App.prototype.fetchTweetLoop = function() {
-  while(true) {
-    var date = new Date();
-    this.title = "The "+(date.getHours()||12)+" O'Clock News";
-    var user = this.twitter.call("users/show", {user_id: this.twitter.currentUser.id});
-    this.about = "The twitter links of " + user.name + " on " + dow[date.getDay()];
-
-    waitfor (var tweets) { this.twitter.User.current().homeTimeline(resume); }
-    tweets = tweets.array;
-    var existingIds = underscore.pluck(this.tweets, 'id');
-    var newIds = underscore.pluck(tweets, 'id');
-
-    newIds = underscore.difference(newIds, existingIds);
-
-    var newTweets = underscore.select(tweets, function(t) { return underscore.include(newIds, t.id); });
-    this.tweets = this.tweets.concat(newTweets);
-
-    logging.debug("adding {length} new tweets to queue", newTweets);
-    c.each(newTweets, this.unprocessedTweets.put, this.unprocessedTweets);
-    this.$eval();
-
-    hold(1000 * 60 * 2);
-  }
-};
-
-App.prototype.processTweetLoop = function() {
-  while(true) {
-    this.processTweet(this.unprocessedTweets.get());
-    if(this.status.loading) this.status.loading = false;
-    this.$root.$eval();
-    hold(1);// let UI update
-  }
-};
-
-App.prototype.processTweet = function(tweet) {
+Twitter.prototype.processTweet = function(tweet) {
   logging.debug("processing tweet: ",null, tweet);
   var link = /(https?:\/\/[^ ]+)/g;
   var links = tweet.text.match(link);
@@ -148,27 +251,7 @@ App.prototype.processTweet = function(tweet) {
   // expand URL if needed
   url = getExpandedURL(url);
   
-  if (!this.articles[url]) {
-    // create and load in two steps, since the load step is blocking
-    // and we want to make sure this.articles[url] is set immediately
-    var article = this.articles[url] = new Article(url, tweet, this);
-    article.loadContent();
-    this.showArticle(article);
-  } else {
-    // article already exists; just add this tweet to its references
-    this.articles[url].addTweet(tweet);
-  }
-};
-
-App.prototype.showArticle = function(article) {
-  logging.info("Showing article: " + article, null, article);
-  // get the column with the smallest displyed height
-  var columns = $('.col', this.$element);
-  var columnHeights = columns.map(function() { return $(this).height() }).get();
-  var minColumnHeight = Math.min.apply(Math, columnHeights);
-  var minColumnIndex = columnHeights.indexOf(minColumnHeight);
-  this.cols[minColumnIndex].push(article);
-  this.$root.$eval();
+  this.processArticle(url, tweet.user.name);
 };
 
 
@@ -299,14 +382,17 @@ function isImageService(url) {
 
 // -------------------- Article / Image objects --------------------
 
-var Article = exports.Article = function(url, tweet) {
+var Article = exports.Article = function(url, user, text) {
   this.url = url;
-  this.tweets = [tweet];
+  this.users = [user];
+  this.pointerText = text;
 };
 
-Article.prototype.addTweet = function(tweet) {
-  this.tweets.push(tweet);
+Article.prototype.addUser = function(user) {
+  this.users.push(user);
 };
+
+Article.prototype.userList = function() { return this.users.join(", "); };
 
 Article.prototype.loadContent = function() {
   logging.debug("Processing article: {url}", this);
@@ -326,30 +412,26 @@ Article.prototype.loadContent = function() {
   if(this.img && this.img.imgService) {
     this.heading.image = img.src;
     this.contextImage = null;
-    this.tweet = this.tweetText();
   } else {
     this.contextImage = this.img;
-    var titleAndTweet = this.getTitleAndTweet();
-    this.heading.text = titleAndTweet[0];
-    this.tweet = titleAndTweet[1];
+    this.populateTitle();
   }
   this.summary = this.getSummary();
-  this.tweet = this.tweetText();
 };
+
 Article.prototype.toString = function() {
   return s("<Article from: {url}>", this);
 };
-Article.prototype.tweetText = function() { return this.tweets[0].text; }
 
-Article.prototype.getTitleAndTweet = function() {
-  var title = this.contents.title;
-  var tweet = this.tweetText();
-  if(!title) {
+Article.prototype.populateTitle = function() {
+  // set header.text to contents.title.
+  // if the title is undefined, shift this.pointerText to replace it
+  this.heading.text = this.contents.title;
+  if(!this.heading.text) {
     // use tweet as title, but don't show anything for tweet text
-    title = tweet;
-    tweet = null;
+    this.heading.text = this.pointerText;
+    this.pointerText = null;
   }
-  return [title, tweet];
 };
 
 Article.prototype.getSummary = function() {

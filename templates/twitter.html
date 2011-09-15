@@ -1,0 +1,14 @@
+<div id="timeline">
+  <ng:include src="'templates/columns.html'"/>
+  <div class="tweets">
+    <div class='btweet' ng:repeat="tweet in linklessTweets">
+      {{tweet.text}}
+      <div class='user'>by <a ng:href="http://twitter.com/#!/{{tweet.user.screenName}}">{{tweet.user.name}}</a></div>
+    </div>
+  </div>
+</div>
+
+<div id="login" ng:hide="status.connected"></div>
+<div id="logout" ng:show="status.connected">
+  <button ng:click="triggerSignout()">Sign out of twitter</a>
+</div>
