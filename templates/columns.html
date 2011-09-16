@@ -1,11 +1,14 @@
 <div class="col" ng:repeat="col in columns">
-  <div class="article" ng:repeat="article in col">
+  <div class="article {{$position}}" ng:repeat="article in col">
     <div class="inner">
       <a ng:href="{{article.url}}">
         <h3 ng:show="article.heading.text">{{article.heading.text}}</h3>
         <img ng:show="article.heading.image" ng:src="{{article.heading.image}}"/>
       </a>
-      <div class="user">by {{article.userList()}}</div>
+      <div class="user">
+        by {{article.userList()}}
+        <a ng:href="{{article.pointerURL}}">(source)
+      </div>
 
       <div ng:show="article.contextImage"
         class="illustration"

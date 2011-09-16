@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:ng="http://angularjs.org">
 <head>
-<title>Twitter Pages</title>
+<title>Megazine</title>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black" />
 
@@ -20,8 +20,17 @@ require("apollo:jquery-binding").install();
 
 var megazine = window.megazine = require('./megazine');
 logging.info("window.megazine = {megazine}", window)
-
 angular.compile(document)();
+if(document.location.hash == '') {
+  document.location.hash = '#/hackernews';
+} else if(document.location.hash.indexOf("oauth") !== -1) {
+  // twitter oauth callback doesn't go to #/twitter, but
+  // we need the twitter controller to run in order to
+  // process the response
+  var twitter = new megazine.Twitter(true);
+  twitter._init();
+  twitter.awaitAuth();
+};
 
 </script>
 <style>
@@ -57,6 +66,10 @@ h1 {
   padding: 10px 10px 10px 10px;
   /* background:#fafafa; */
 }
+.article.first .inner {
+  border: none;
+}
+
 h3 {
   font: 18px 'Vollkorn';
   font-weight: normal;
@@ -125,6 +138,9 @@ h3 a:visited {
   left:0;
   background: #eee;
   text-align:center;
+  z-index:999;
+  font-family: 'Vollkorn';
+  font-size:2em;
 }
 #about {
   display:block;
@@ -135,6 +151,44 @@ h3 a:visited {
   position:fixed;
   top:0;
   right:0;
+  padding:2px;
+  padding-left:10px;
+  opacity:0.9;
+  color:#555;
+  background:#eee;
+  border-bottom-left-radius:5px;
+}
+.tabbar {
+  border-bottom: 1px solid #ddd;
+}
+a.tab {
+  z-index:50;
+  position:relative;
+  display:inline-block;
+  top:1px;
+  padding:5px 12px;
+  padding-bottom: 2px;
+  font-family: 'Vollkorn';
+  background: #ccc;
+  text-decoration: none;
+  border-radius: 8px;
+  border:1px solid #aaa;
+  text-shadow: 0px 1px #eee;
+  color: #333;
+  border-bottom-left-radius:0;
+  border-bottom-right-radius:0;
+  border-bottom: none;
+}
+
+.tabbar.twitter a.twitter, .tabbar.hackernews a.hackernews {
+  color:black;
+  background:white;
+  border-color:#ddd;
+}
+.error {
+  font-size: 1.5em;
+  color: #b33;
+  margin:20px 0;
 }
 @media screen and (max-width: 900px) {
   #timeline .col {
@@ -153,11 +207,15 @@ h3 a:visited {
   <!-- <pre>STATUS: {{status}}</pre> -->
 
 <div id="loading" class="loading" ng:show="(!news) || news.loading"><div style="margin-top:20%">LOADING...</div></div>
-  <h1>{{panel.title}}</h1>
-  <div id="about">{{panel.about}}</div>
+<div style="display:none" ng:show="news.type">
+  <h1>{{news.title}}</h1>
+  <div id="about">{{news.about}}</div>
   <h3 id="unprocessedItems" style="display:none;" ng:show="news.unprocessedItems">loading {{news.unprocessedItems}} items...</h3>
-  <a href="#/hackernews">hacker news</a>
-  <a href="#/twitter">twitter</a>
+  <div class="tabbar {{news.type}}" ng:show="news">
+    <a class="tab hackernews" href="#/hackernews">hacker news</a>
+    <a class="tab twitter" href="#/twitter">your twitter</a>
+  </div>
+  <div class="error" ng:show="news.error">Error: {{news.error.message}}<br>Please try again shortly.</div>
   <ng:view/>
 </div>
 

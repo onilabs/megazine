@@ -11,44 +11,39 @@ var dow = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday
 var c = require('apollo:collection');
 var imgServiceDomains = ["twitpic.com", "yfrog.com"];
 var underscore = require("./underscore.js");
+var logging = require("apollo:logging");
+var collection = require("apollo:collection");
+
+// replace with your own application id:
+var twitterAppId = "hkEsBjNpWsOVKQ2gKyr1kQ";
 
 if(logging.isEnabled(logging.VERBOSE)) {
   require("apollo:debug").console({receivelog:false});
 }
 
-var logging = require("apollo:logging");
-var collection = require("apollo:collection");
-
 // the main app controller
 var App = exports.App = function App(route) {
   route.when('/twitter', {controller: Twitter, template: "templates/twitter.html"});
   route.when('/hackernews', {controller: HackerNews, template: "templates/hackernews.html"});
-  // route.otherwise({redirectTo: '/hackernews'});
+  spawn(this.run(route));
+};
+App.$inject=['$route'];
 
+App.prototype.run = function(route) {
+  // every time the route changes, load the appropriate
+  // news type (and abort the old news loader if required):
   var currentStrata;
   while (true) {
-    try {
-      logging.debug("before first route");
-      waitfor() { route.onChange(resume); }
-      logging.debug("after first route");
-      if(currentStrata) { currentStrata.abort(); currentStrata = null; }
-      if(!route.current || !route.current.scope) {
-        continue;
-      }
-      this.news = route.current.scope;
+    waitfor() { route.onChange(resume); }
+    if(currentStrata) { currentStrata.abort(); currentStrata = null; }
+    hold(0); // scope seems to be initialized right *after* this code, so we need a delay
 
-      // scope seems to be initialized right after this callback, so we need a delay:
-      hold(200);
-      logging.debug("after first route (hold)");
-      this.news._init();
-      currentStrata = spawn(this.news.run());
-    } catch (e) {
-      logging.error("Error!", null, e);
-    }
+    if(!(route.current && route.current.scope)) continue;
+    this.news = route.current.scope;
+    this.news._init();
+    currentStrata = spawn(this.news.run());
   };
 };
-
-App.$inject=['$route'];
 
 var newsFunctions = {
   // methods common across all news sources (twitter, hackernews, ...)
@@ -59,15 +54,45 @@ var newsFunctions = {
     this.unprocessedItems = 0;
     this.items = [];
     this.redraw();
+    this.title = this.getTitle();
   },
+  
+  loadTimeout: 5000,
 
   _init: function() { this.reset(); },
 
   run: function() {
-    while(true) {
-      this.loadNewItems()
-      hold(1000 * 60 * 2); // sleep 2 minutes
+    try {
+      // keep loading new items every 2 mins
+      while(true) {
+        this.title = this.getTitle();
+        using(this.workItem()) {
+          try {
+            var items = this.loadNewItems();
+          } or {
+            hold(this.loadTimeout);
+            throw new Error("Couldn't load news items.");
+          }
+        }
+        var newItems = this.addNewItems(items);
+        c.par.map(newItems, function(item) {
+          using(this.workItem()) {
+            this.processItem(item);
+          }
+        }, this);
+
+        hold(1000 * 60 * 2);
+      }
+    } catch(e) {
+      this.error = e;
+      this.redraw();
+      throw(e);
     }
+  },
+
+  getTitle: function() {
+    var date = new Date();
+    return "The "+(date.getHours()||12)+" O'Clock News";
   },
 
   workItem: function() {
@@ -77,7 +102,6 @@ var newsFunctions = {
     return {
       __finally__: function() {
         self.unprocessedItems--;
-        logging.debug("unprocessed items decremented to " + self.unprocessedItems);
         self.redraw();
       }
     };
@@ -95,11 +119,11 @@ var newsFunctions = {
     return newItems;
   },
 
-  processArticle: function(url, user, text) {
+  processArticle: function(url, user, text, pointerURL) {
     if (!this.articles[url]) {
       // create and load in two steps, since the load step is blocking
       // and we want to make sure this.articles[url] is set immediately
-      var article = this.articles[url] = new Article(url, user, text);
+      var article = this.articles[url] = new Article(url, user, text, pointerURL);
       article.loadContent();
       this.showArticle(article);
     } else {
@@ -110,15 +134,17 @@ var newsFunctions = {
   },
 
   redraw: function() {
-    logging.debug("in redraw(), this = ", null, this);
-    if(!this.$root) return; // XX why does this happen?
+    if(!this.$root) {
+      // XXX why does this happen?
+      logging.warn("redraw() called while $root is undefined", null, this);
+      return;
+    }
     this.$root.$eval();
-    hold(1);// let UI update
+    hold(0);
   },
 
   showArticle: function(article) {
     logging.info("Showing article: " + article, null, article);
-    logging.debug("columns = ", null, this.columns);
     // get the column with the smallest displyed height
     var columns = $('.col', this.$element);
     var columnHeights = columns.map(function() { return $(this).height() }).get();
@@ -127,111 +153,113 @@ var newsFunctions = {
     this.columns[minColumnIndex].push(article);
     this.redraw();
   }
-
 };
 
 var Twitter = exports.Twitter = function Twitter() {};
+Twitter.prototype = common.mergeSettings(newsFunctions, {
+  super: newsFunctions,
+  type:'twitter',
 
-Twitter.prototype = common.mergeSettings(newsFunctions, {super: newsFunctions});
-Twitter.prototype._init = function() {
-  logging.info("twitter initializing");
-  this.loading = true;
-  // Load the @Anywhere API and init with your application id:
-  this.twitter = require("apollo:twitter").initAnywhere({id:"hkEsBjNpWsOVKQ2gKyr1kQ"});
-  // show twitter connect button:
-  this.twitter("#login").connectButton();
-  this.loading = false;
-  this.super._init.call(this);
-};
-Twitter.prototype.reset = function() {
-  this.columns = [[],[],[]];
-  this.signoutEvent = new cutil.Event();
-  this.linklessTweets = [];
-  this.super.reset.call(this);
-};
+  _init: function() {
+    logging.info("twitter initializing");
+    this.loading = true;
+    this.twitter = require("apollo:twitter").initAnywhere({id:twitterAppId});
+    this.twitter("#login").connectButton();
+    this.loading = false;
+    this.super._init.call(this);
+  },
+  reset: function() {
+    this.columns = [[],[],[]];
+    this.signoutEvent = new cutil.Event();
+    this.linklessTweets = [];
+    this.connected = false;
+    this.super.reset.call(this);
+  },
 
-var HackerNews = exports.HackerNews = function HackerNews() {}
-HackerNews.prototype = common.mergeSettings(newsFunctions, {super: newsFunctions});
+  loadNewItems: function() {
+    var date = new Date();
+    var user = this.twitter.call("users/show", {user_id: this.twitter.currentUser.id});
+    this.about = "The twitter links of " + user.name + " on " + dow[date.getDay()];
 
-HackerNews.prototype.reset = function() {
-  this.columns = [[],[],[],[]];
-  this.super.reset.call(this);
-};
-HackerNews.prototype.loadNewItems = function() {
-  var date = new Date();
-  this.title = "The "+(date.getHours()||12)+" O'Clock News";
-  this.about = "The hackernews links on " + dow[date.getDay()];
+    waitfor (var tweets) { this.twitter.User.current().homeTimeline(resume); }
+    return tweets.array;
+  },
 
-  var items = http.jsonp('http://api.ihackernews.com/page', {query: {format:'jsonp'}}).items;
-  var newItems = this.addNewItems(items);
-  c.par.map(newItems, function(item) {
-    using(this.workItem()) {
-      logging.debug("hackernws item: ",null, item);
-      this.processArticle(item.url, item.postedBy, item.title);
-    }
-  }, this);
-};
-
-Twitter.prototype.loadNewItems = function() {
-  var date = new Date();
-  this.title = "The "+(date.getHours()||12)+" O'Clock News";
-  var user = this.twitter.call("users/show", {user_id: this.twitter.currentUser.id});
-  this.about = "The twitter links of " + user.name + " on " + dow[date.getDay()];
-
-  waitfor (var tweets) { this.twitter.User.current().homeTimeline(resume); }
-  var newTweets = this.addNewItems(tweets.array);
-
-  logging.debug("all new tweets = ",null,newTweets);
-  c.par.map(newTweets, function(tweet) {
-    using(this.workItem()) {
-      this.processTweet(tweet);
-    }
-  }, this);
-};
-
-Twitter.prototype.run = function() {
-  while(true) {
+  awaitAuth: function() {
     this.connected = this.twitter.isConnected();
     this.redraw();
     // wait until we're connected:
     if (!this.connected) this.twitter.waitforEvent("authComplete");
     this.connected = true;
-    this.redraw(true);
-    waitfor {
-      this.super.run.call(this);
-    } or {
-      this.signoutEvent.wait();
-      collapse;
-      logging.info("sign out button clicked!");
-      twttr.anywhere.signOut();
-      this.reset();
-      this.connected = false;
+  },
+
+  run: function() {
+    // overrise super.run() to ensure we're connected first
+    while(true) {
+      this.awaitAuth();
+      this.redraw(true);
+      waitfor {
+        this.super.run.call(this);
+      } or {
+        this.signoutEvent.wait();
+        collapse;
+        twttr.anywhere.signOut();
+        this.reset();
+      }
     }
+  },
+
+  triggerSignout: function() {
+    this.signoutEvent.set();
+  },
+
+  processItem: function(tweet) {
+    logging.debug("processing tweet: ",null, tweet);
+    var link = /(https?:\/\/[^ ]+)/g;
+    var links = tweet.text.match(link);
+    tweet.name = tweet.user.name;
+
+    // strage that twitter doesn't provide this...
+    tweet.url = s("http://twitter.com/#!/{user}/status/{id}",
+      {user:tweet.user.screenName, id:tweet.id});
+
+    if(!(links && links.length)) {
+      this.linklessTweets.push(tweet);
+      return;
+    }
+
+    var url = links[0];
+
+    // expand URL if needed
+    url = getExpandedURL(url);
+    
+    this.processArticle(url, tweet.user.name, tweet.text, tweet.url);
   }
-};
+});
 
-Twitter.prototype.triggerSignout = function() {
-  this.signoutEvent.set();
-};
+var HackerNews = exports.HackerNews = function HackerNews() {}
+HackerNews.prototype = common.mergeSettings(newsFunctions, {
+  super: newsFunctions,
+  type: 'hackernews',
 
-Twitter.prototype.processTweet = function(tweet) {
-  logging.debug("processing tweet: ",null, tweet);
-  var link = /(https?:\/\/[^ ]+)/g;
-  var links = tweet.text.match(link);
-  tweet.name = tweet.user.name;
+  reset: function() {
+    this.columns = [[],[],[],[]];
+    this.super.reset.call(this);
+  },
 
-  if(!(links && links.length)) {
-    this.linklessTweets.push(tweet);
-    return;
-  }
+  loadNewItems: function() {
+    var date = new Date();
+    this.about = "Hacker news links on " + dow[date.getDay()];
+    return http.jsonp('http://api.ihackernews.com/page', {query: {format:'jsonp'}}).items;
+  },
 
-  var url = links[0];
+  processItem: function(item) {
+    logging.debug("processing item: ",null, item);
+    var commentUrl = s("http://news.ycombinator.com/item?id={id}", item);
+    this.processArticle(item.url, item.postedBy, item.title, commentUrl);
+  },
 
-  // expand URL if needed
-  url = getExpandedURL(url);
-  
-  this.processArticle(url, tweet.user.name);
-};
+});
 
 
 
@@ -361,10 +389,11 @@ function isImageService(url) {
 
 // -------------------- Article / Image objects --------------------
 
-var Article = exports.Article = function(url, user, text) {
+var Article = exports.Article = function(url, user, text, pointerURL) {
   this.url = url;
   this.users = [user];
   this.pointerText = text;
+  this.pointerURL = pointerURL;
 };
 
 Article.prototype.addUser = function(user) {
