@@ -197,7 +197,7 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
     // overrise super.run() to ensure we're connected first
     while(true) {
       this.awaitAuth();
-      this.redraw(true);
+      this.redraw();
       waitfor {
         this.super.run.call(this);
       } or {
@@ -219,7 +219,7 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
     var links = tweet.text.match(link);
     tweet.name = tweet.user.name;
 
-    // strage that twitter doesn't provide this...
+    // strange that twitter doesn't provide this...
     tweet.url = s("http://twitter.com/#!/{user}/status/{id}",
       {user:tweet.user.screenName, id:tweet.id});
 
