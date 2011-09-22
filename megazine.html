@@ -10,7 +10,7 @@
 
 
 <script src="../oni-apollo.js"></script>
-<script src="angular-0.9.19.min.js"></script>
+<script src="lib/angular-0.9.19.min.js"></script>
 
 </script>
 <script type="text/sjs">
@@ -18,7 +18,8 @@ var logging = require("apollo:logging");
 logging.setLevel(logging.DEBUG);
 require("apollo:jquery-binding").install();
 
-var megazine = window.megazine = require('./megazine');
+var megazine = window.megazine = require('./app/megazine');
+var Twitter = require("./app/news-sources").Twitter;
 logging.info("window.megazine = {megazine}", window)
 angular.compile(document)();
 if(document.location.hash == '') {
@@ -27,7 +28,7 @@ if(document.location.hash == '') {
   // twitter oauth callback doesn't go to #/twitter, but
   // we need the twitter controller to run in order to
   // process the response
-  var twitter = new megazine.Twitter(true);
+  var twitter = new Twitter();
   twitter._init();
   twitter.awaitAuth();
 };
