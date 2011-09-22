@@ -38,6 +38,11 @@ var newsFunctions = {
     }, this);
   },
 
+  rerun: function() {
+    this.error = null;
+    spawn(this.run());
+  },
+
   run: function() {
     try {
       // keep loading new items every 2 mins
@@ -48,7 +53,7 @@ var newsFunctions = {
             var items = this.loadNewItems();
           } or {
             hold(this.loadTimeout);
-            throw new Error("Couldn't load news items.");
+            throw new Error("Couldn't load news items in " + this.loadTimeout + "ms");
           }
         }
         var newItems = this.addNewItems(items);

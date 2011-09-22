@@ -6,10 +6,9 @@ var http = require('apollo:http');
 var s = require("apollo:common").supplant;
 
 var underscore = require("../lib/underscore.js");
-var imgServiceDomains = ["twitpic.com", "yfrog.com"];
+var imgServiceDomains = ["twitpic.com", "yfrog.com", "imgur.com"];
 
 // -------------------- URL / Image helper functions --------------------
-
 
 // attach a rate limited version of `fn` to `fn.rateLimited`
 function rateLimit(fn, rate) {
@@ -74,11 +73,24 @@ var extractImage = exports.extractImage = function extractImage(page, url) {
 };
 
 function getBestImage(images, baseURL) {
-  c.each(images, guessImageSize);
-
-  // filter out images < 140px or with no `src`; we never want to display them
+  // remove src-less images
+  var seenSources = [];
   images = c.filter(images, function(img) {
-    if(!img.src) return false;
+    if(!img.src || underscore.include(seenSources, img.src)) {
+      logging.debug("ignoring img with src: {src}", img);
+      return false;
+    }
+    seenSources.push(img.src);
+    return img.src;
+  });
+
+  c.par.each(images, function(img) {
+    img.src = http.canonicalizeURL(img.src, baseURL);
+    guessImageSize(img);
+  });
+
+  // filter out images < 140px; we never want to display them
+  images = c.filter(images, function(img) {
     return (img.width === undefined) || (img.width > 140);
   });
   images.sort(imageCompare);
@@ -87,17 +99,16 @@ function getBestImage(images, baseURL) {
   logging.debug("images (worst to best) = ", null, images);
 
   var best_img = images[images.length-1];
-  var fullURL = http.canonicalizeURL(best_img.src, baseURL);
-  logging.debug("Canonicalizing URL " + best_img.src + " on " + baseURL + " -> " + fullURL);
-  return new Image(fullURL, isImageService(baseURL));
+  return new ArticleImage(best_img.src, isImageService(baseURL));
 };
 
 function imageCompare(a, b) {
   var criteria = function(img) {
     var isJpeg = img.src.match(/\.jpe?g/);
     var width = img.width ? img.width : 0;
+    var height = img.height ? img.height : 100;
     // isJpeg trumps width, jpegs are less likely page decoration
-    return [isJpeg ? 1 : 0, width];
+    return [isJpeg ? 1 : 0, width * height];
   }
 
   var ca = criteria(a);
@@ -107,15 +118,16 @@ function imageCompare(a, b) {
 };
 
 function guessImageSize(img) {
-  if(img.size) return;
+  if(img.width) return;
   var match;
 
   // guess based on style attribute (accurate but uncommon)
   var styleRe = /(?:^|[^-])width: *(\d+)px/;
   match = (img.style && img.style.match(styleRe));
   if(match) {
-    logging.debug("guessed image width of " + match[1] + " based on style string: " + img.style, null, match);
+    logging.debug("guessed image width of " + match[1] + " based on style string: " + img.style + " for url " + img.src, null, match);
     img.width = parseInt(match[1]);
+    img.height = img.width; // not correct, but roughly accurate
     return;
   };
 
@@ -125,8 +137,36 @@ function guessImageSize(img) {
   if(match) {
     logging.debug("guessed image width of " + match[1] + " based on url: " + img.src);
     img.width = parseInt(match[1]);
+    img.height = img.width; // not correct, but roughly accurate
+    return;
+  }
+
+  // last (bandwidth-intensive) resort: actually load it...
+  try {
+    var loaded = loadImage(img.src, 5);
+    img.width = loaded.width;
+    img.width = loaded.height;
+  } catch (e) {
+    logging.debug("failed to load image: " + e);
   }
 };
+
+var loadImage = exports.loadImage = function(url, timeout) {
+  var domImg = new Image();
+  timeout = timeout || 5;
+  try {
+    waitfor() {
+      domImg.onload = resume;
+    }
+    logging.debug("loaded image {src} to find that its width is {width}", domImg);
+    return domImg;
+  } or {
+    domImg.src=url;
+    hold(timeout * 1000);
+    throw new Error("Image " + url + " failed to load in " + timeout + "s");
+  }
+};
+
 
 function isImageService(url) {
   var domain = http.parseURL(url).authority;
@@ -135,7 +175,7 @@ function isImageService(url) {
 };
 
 
-var Image = exports.Image = function Image(src, imgService) {
+var ArticleImage = exports.ArticleImage = function ArticleImage(src, imgService) {
   this.src = src;
   this.imgService = imgService;
   this.style = {
@@ -145,5 +185,5 @@ var Image = exports.Image = function Image(src, imgService) {
     this.style.height = 200;
   }
 };
-Image.prototype.toString = function() { return s("<Image: {src}>", this); };
+ArticleImage.prototype.toString = function() { return s("<ArticleImage: {src}>", this); };
 
