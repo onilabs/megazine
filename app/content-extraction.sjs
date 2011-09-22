@@ -6,6 +6,7 @@ var http = require('apollo:http');
 var s = require("apollo:common").supplant;
 
 var underscore = require("../lib/underscore.js");
+var Cache = require('./cache').Cache;
 var imgServiceDomains = ["twitpic.com", "yfrog.com", "imgur.com"];
 
 // -------------------- URL / Image helper functions --------------------
@@ -15,15 +16,14 @@ function rateLimit(fn, rate) {
   fn.rateLimited = cutil.makeRateLimitedFunction(fn, rate);
 };
 
-var getExpandedURL = exports.getExpandedURL = (function() {
-  var cache = {};
-  return function(url) {
-    if(!cache[url]) {
-      cache[url] = expandUrl.rateLimited(url);
-    }
-    return cache[url];
-  };
-})();
+var getExpandedURL = exports.getExpandedURL = function(url, cache) {
+  var cached = cache.get(url);
+  if(!cached) {
+    cached = {key: url, fullURL: expandUrl.rateLimited(url)};
+    cache.save(cached);
+  }
+  return cached.fullURL;
+};
 
 var expandUrl = exports.expandUrl = function(url) {
   var data = http.jsonp("http://api.longurl.org/v2/expand", {

@@ -4,7 +4,8 @@ var s = require("apollo:common").supplant;
 
 // -------------------- Article object --------------------
 
-var Article = exports.Article = function(url, user, text, pointerURL) {
+var Article = exports.Article = function(id, url, user, text, pointerURL) {
+  this.key = id;
   this.url = url;
   this.users = [user];
   this.pointerText = text;

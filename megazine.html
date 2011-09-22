@@ -11,6 +11,7 @@
 
 <script src="../oni-apollo.js"></script>
 <script src="lib/angular-0.9.19.min.js"></script>
+<script src="lib/lawnchair-0.6.1.min.js"></script>
 
 </script>
 <script type="text/sjs">
@@ -250,8 +251,7 @@ a.tab {
     <a class="tab hackernews" href="#/hackernews">hacker news</a>
     <a class="tab twitter" href="#/twitter">your twitter</a>
   </div>
-  <div class="error" ng:show="news.error">Error: {{news.error.message}}<br>Please try again shortly.<br>
-    <button ng:click="news.rerun()">Try again</button>
+  <div class="error" ng:show="news.error">Error: {{news.error.message}}. <button ng:click="news.rerun()">Try again</button>
   </div>
   <!-- view is detemined by the current App route -->
   <ng:view/>

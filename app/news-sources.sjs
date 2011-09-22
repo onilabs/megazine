@@ -9,6 +9,7 @@ var Article = require('article').Article;
 
 var underscore = require("../lib/underscore.js");
 var Content = require("./content-extraction");
+var Cache = require("./cache").Cache;
 
 var dow = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
@@ -26,7 +27,10 @@ var newsFunctions = {
   
   loadTimeout: 5000,
 
-  _init: function() { this.reset(); },
+  _init: function() {
+    this.reset();
+    this.cache = new Cache(this.type);
+  },
 
   processItems: function(items) {
     // process each item, wrapped in a `work item` to show
@@ -36,6 +40,11 @@ var newsFunctions = {
         this.processItem(item);
       }
     }, this);
+    this.flush_cache();
+  },
+
+  flush_cache: function() {
+    this.cache.flush();
   },
 
   rerun: function() {
@@ -53,7 +62,7 @@ var newsFunctions = {
             var items = this.loadNewItems();
           } or {
             hold(this.loadTimeout);
-            throw new Error("Couldn't load news items in " + this.loadTimeout + "ms");
+            throw new Error("News items not received within " + Math.round(this.loadTimeout / 1000) + " seconds");
           }
         }
         var newItems = this.addNewItems(items);
@@ -98,12 +107,19 @@ var newsFunctions = {
     return newItems;
   },
 
-  processArticle: function(url, user, text, pointerURL) {
+  processArticle: function(id, url, user, text, pointerURL) {
     if (!this.articles[url]) {
       // create and load in two steps, since the load step is blocking
       // and we want to make sure this.articles[url] is set immediately
-      var article = this.articles[url] = new Article(url, user, text, pointerURL);
-      article.loadContent();
+      var article = this.articles[url] = new Article(id, url, user, text, pointerURL);
+      var cached = this.cache.get(id);
+      if(cached) {
+        logging.verbose("using cached article for URL " + url);
+        underscore.extend(article, cached);
+      } else {
+        article.loadContent();
+        this.cache.save(article);
+      }
       this.showArticle(article);
     } else {
       // article already exists; just add this user to its references
@@ -145,6 +161,7 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
     this.twitter = require("apollo:twitter").initAnywhere({id:this.appId});
     this.twitter("#login").connectButton();
     this.loading = false;
+    this.url_cache = new Cache("twitter_urls");
     this.super._init.call(this);
   },
   reset: function() {
@@ -210,9 +227,14 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
     var url = links[0];
 
     // expand URL if needed
-    url = Content.getExpandedURL(url);
+    url = Content.getExpandedURL(url, this.url_cache);
     
-    this.processArticle(url, tweet.user.name, tweet.text, tweet.url);
+    this.processArticle(tweet.id, url, tweet.user.name, tweet.text, tweet.url);
+  },
+
+  flush_cache: function() {
+    this.super.flush_cache.call(this);
+    this.url_cache.flush();
   }
 });
 
@@ -235,7 +257,7 @@ HackerNews.prototype = common.mergeSettings(newsFunctions, {
   processItem: function(item) {
     logging.debug("processing item: ",null, item);
     var commentUrl = s("http://news.ycombinator.com/item?id={id}", item);
-    this.processArticle(item.url, item.postedBy, item.title, commentUrl);
+    this.processArticle(item.id, item.url, item.postedBy, item.title, commentUrl);
   },
 
 });
