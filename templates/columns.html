@@ -13,9 +13,9 @@
 
       <div ng:show="article.contextImage"
         class="illustration"
-        ng:style="article.contextImage.style"></div>
+        style="background-image:{{article.contextImage.style['background-image']}}"></div>
       
-      <div class="tweet" ng:show="article.pointerText">{{article.pointerText}}</div>
+      <div class="pointerText" ng:show="article.pointerText">{{article.pointerText}}</div>
 
       <div class="summary"
         ng:show="article.summary"

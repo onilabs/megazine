@@ -14,26 +14,24 @@
 
 </script>
 <script type="text/sjs">
-var logging = require("apollo:logging");
-logging.setLevel(logging.DEBUG);
 require("apollo:jquery-binding").install();
 
 // install spinners in the background, as they're less important than actually loading
+spawn((function() {
+  require("./lib/spin.min.js");
+  /* var spinContainer = $("<div class='spinner'/>"); */
+  var spinContainer = $("#loading .spinner").empty();
+  new Spinner().spin(spinContainer[0]);
+  new Spinner({
+    lines: 6,
+    length: 2,
+    width:3,
+    radius: 2,
+  }).spin($("#unprocessedItems .spinner")[0]);
+})());
 
-$(function() {
-  spawn((function() {
-    require("./lib/spin.min.js");
-    /* var spinContainer = $("<div class='spinner'/>"); */
-    var spinContainer = $("#loading .spinner").empty();
-    new Spinner().spin(spinContainer[0]);
-    new Spinner({
-      lines: 6,
-      length: 2,
-      width:3,
-      radius: 2,
-    }).spin($("#unprocessedItems .spinner")[0]);
-  })());
-});
+var logging = require("apollo:logging");
+logging.setLevel(logging.DEBUG);
 
 var megazine = window.megazine = require('./app/megazine');
 var Twitter = require("./app/news-sources").Twitter;
@@ -105,13 +103,13 @@ h3 a:visited {
   color: #666;
   font-size: 0.9em;
 }
-.tweet, .btweet {
+.pointerText, .btweet {
   font: 15px serif;
   font-weight: normal;
   line-height:20px;
   color:#222  ;
 }
-.tweet {
+.pointerText {
   margin-bottom: 10px;
 }
 .tweets {
