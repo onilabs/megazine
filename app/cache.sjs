@@ -33,8 +33,12 @@ Cache.prototype = {
 
   _keep: function(obj) {
     var key = obj.key;
-    if(!key || (key.toString() !== key)) {
-      throw new Error("item persisted to " + this.service + " cache without a string key: " + JSON.stringify(obj));
+    if(!key) {
+      throw new Error("item persisted to " + this.service + " cache without a key: " + JSON.stringify(obj));
+    }
+    if(key.toString() !== key) {
+      logging.warn("non-string key in DB: " + JSON.stringify(key));
+      obj.key = key.toString();
     }
     this._seen[key] = true;
   },

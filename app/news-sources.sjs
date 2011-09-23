@@ -31,6 +31,7 @@ var newsFunctions = {
     this.reset();
     this.cache = new Cache(this.type);
     this.appendMethod = 'push'; // start by putting new items at the bottom
+    this.errorEvent = new cutil.Event();
   },
 
   processItems: function(items) {
@@ -54,6 +55,7 @@ var newsFunctions = {
   },
 
   run: function() {
+    this.errorEvent.clear();
     try {
       // keep loading new items every 2 mins
       while(true) {
@@ -71,11 +73,18 @@ var newsFunctions = {
         this.appendMethod = 'unshift'; // future items get inserted above existing items
         hold(1000 * 60 * 2);
       }
+    } or {
+      this.errorEvent.wait();
     } catch(e) {
-      this.error = e;
-      this.redraw();
-      throw(e);
+      this.setError(e);
     }
+  },
+
+  setError: function(e) {
+    this.error = e;
+    this.errorEvent.set();
+    this.redraw();
+    throw(e);
   },
 
   getTitle: function() {
@@ -122,6 +131,7 @@ var newsFunctions = {
       // create and load in two steps, since the load step is blocking
       // and we want to make sure this.articles[url] is set immediately
       var article = this.articles[url] = new Article(id, url, user, text, pointerURL);
+      logging.debug("getting article", null, article);
       var cached = this.cache.get(id);
       if(cached) {
         logging.verbose("using cached article for URL " + url);
@@ -135,7 +145,6 @@ var newsFunctions = {
       // article already exists; just add this user to its references
       this.articles[url].addUser(user);
     }
-    this.redraw();
   },
 
   redraw: function() {
@@ -149,6 +158,7 @@ var newsFunctions = {
   },
 
   showArticle: function(article) {
+    if(article.hidden) return;
     logging.info("Showing article: " + article, null, article);
     // get the column with the smallest displyed height
     var columns = $('.col', this.$element);
@@ -156,7 +166,28 @@ var newsFunctions = {
     var minColumnHeight = Math.min.apply(Math, columnHeights);
     var minColumnIndex = columnHeights.indexOf(minColumnHeight);
     this.columns[minColumnIndex][this.appendMethod](article);
-    this.redraw();
+  },
+
+  hideArticle: function(article) {
+    logging.debug("hiding article: ", null, article);
+    this.bg(function() {
+      article.hidden = true;
+      this.cache.save(article);
+      c.each(this.columns, function(col) {
+        angular.Array.remove(col, article);
+      });
+    });
+  },
+
+  bg: function(action) {
+    spawn((function() {
+      try {
+        action.call(this);
+      } catch (e) {
+        this.setError(e);
+      }
+      this.redraw();
+    }).call(this));
   }
 };
 
@@ -230,7 +261,7 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
       {user:tweet.user.screenName, id:tweet.idStr});
     
     if(!(links && links.length)) {
-      this.linklessTweets.push(tweet);
+      this.linklessTweets[this.appendMethod](tweet);
       return;
     }
 

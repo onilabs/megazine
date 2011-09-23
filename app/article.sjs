@@ -5,7 +5,7 @@ var s = require("apollo:common").supplant;
 // -------------------- Article object --------------------
 
 var Article = exports.Article = function(id, url, user, text, pointerURL) {
-  this.key = id.toString();
+  this.key = 'article_ ' + id.toString(); // workaround lawnchair bug #58
   this.url = url;
   this.users = [user];
   this.pointerText = text;
