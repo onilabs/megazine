@@ -7,7 +7,7 @@
         <h3 ng:show="article.heading.text">{{article.heading.text}}</h3>
         <img ng:show="article.heading.image" ng:src="{{article.heading.image}}"/>
       </a>
-      <div class="user">
+      <div class="user" ng:show="article.users">
         by {{article.userList()}}
         <a ng:href="{{article.pointerURL}}">(source)
       </div>

@@ -9,14 +9,15 @@
 <link href='http://fonts.googleapis.com/css?family=Vollkorn' rel='stylesheet' type='text/css'>
 
 
-<script src="lib/angular-0.9.19.min.js"></script>
+<!-- <script src="lib/angular-0.9.19.min.js"></script> -->
+<script src="lib/angular-0.9.19.js"></script>
 <script src="lib/lawnchair-0.6.1.min.js"></script>
 
 <!-- TODO: make this a versioned URL once 0.13 is out -->
 <!-- <script src="../oni-apollo.js"></script> -->
 <script src="https://raw.github.com/onilabs/apollo/master/oni-apollo.js"></script>
 <script type="text/sjs">
-require.hubs.unshift(['apollo:', 'github:onilabs/apollo/master/modules/']);
+/* require.hubs.unshift(['apollo:', 'github:onilabs/apollo/master/modules/']); */
 
 require("apollo:jquery-binding").install();
 var Twitter = require("./app/news-sources").Twitter;
@@ -43,6 +44,7 @@ if(document.location.host.indexOf('127.0.0.1') !== -1 || document.location.host.
 }
 
 var megazine = window.megazine = require('./app/megazine');
+angular.filter.escapeURI = function(str) { return encodeURIComponent(str); }
 
 logging.info("window.megazine = {megazine}", window)
 angular.compile(document)();
@@ -220,7 +222,11 @@ a.hide {
 .tabbar {
   border-bottom: 1px solid #ddd;
 }
-a.tab {
+.tabbar a {
+  text-decoration:none;
+  color: #333;
+}
+.tabbar .tab {
   z-index:50;
   position:relative;
   display:inline-block;
@@ -229,20 +235,35 @@ a.tab {
   padding-bottom: 2px;
   font-family: 'Vollkorn';
   background: #ccc;
-  text-decoration: none;
   border-radius: 8px;
   border:1px solid #aaa;
   text-shadow: 0px 1px #eee;
-  color: #333;
   border-bottom-left-radius:0;
   border-bottom-right-radius:0;
   border-bottom: none;
 }
+.tabbar .delete {
+  display:inline-block;
+  padding-left:5px;
+  background:none;
+  width:1em;
+  height:1em;
+  text-align:center;
+  color: #888;
+}
 
-.tabbar.twitter a.twitter, .tabbar.hackernews a.hackernews {
+.tabbar .tab.active_true {
   color:black;
   background:white;
   border-color:#ddd;
+}
+.newRSS, .newRSS input {
+  font-family: 'Vollkorn';
+  font-size:1em;
+}
+.newRSS {
+  text-align:center;
+  padding:2em;
 }
 .error {
   font-size: 1.5em;
@@ -263,20 +284,25 @@ a.tab {
 
 <div ng:controller="megazine.App">
 
-  <!-- <pre>STATUS: {{status}}</pre> -->
-
 <div id="loading" class="loading" ng:show="(!news) || news.loading"><div class="spinner">LOADING...</div></div>
-<div style="display:none" ng:show="news.type">
+<div style="display:none" ng:show="news">
   <h1>{{news.title}}</h1>
   <div id="about">{{news.about}}</div>
   <h3 id="unprocessedItems" style="display:none;" ng:show="news.unprocessedItems"><div class="spinner"></div>loading {{news.unprocessedItems}} items</h3>
-  <div class="tabbar {{news.type}}" ng:show="news">
-    <a class="tab hackernews" href="#/hackernews">hacker news</a>
-    <a class="tab twitter" href="#/twitter">your twitter</a>
+  <div class="tabbar" ng:show="news">
+    <a class="tab hackernews active_{{news.type == 'hackernews'}}" href="#/hackernews">hacker news</a>
+    <a class="tab twitter active_{{news.type == 'twitter'}}" href="#/twitter">your twitter</a>
+    <span ng:repeat="feed in feeds">
+      <!-- TODO: fix double-encoding requirement -->
+      <span class="tab rss active_{{route.current.params.feed == (feed.url | escapeURI)}}">
+        <a ng:href="#/rss/{{feed.url | escapeURI | escapeURI}}">{{feed.name}}<a ng:click="removeFeed(feed)" class="delete">x</a></a>
+      </span>
+    </span>
+    <a class="tab rss active_{{news.type == 'add-rss'}}" href="#/rss/new"><strong>+</strong></a>
   </div>
   <div class="error" ng:show="news.error">
-    Error: {{news.error.message}}.<br />
-    <button ng:click="news.rerun()">Resume</button>
+    {{news.error.message}}.<br />
+    <button ng:click="news.rerun()">Continue&hellip;</button>
   </div>
   <!-- view is detemined by the current App route -->
   <ng:view/>

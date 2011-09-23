@@ -82,6 +82,8 @@ var newsFunctions = {
   },
 
   setError: function(e) {
+    if(!(e instanceof Error)) { e = new Error(e); }
+    logging.error("Error loading news: {message}", e, e);
     this.error = e;
     this.errorEvent.set();
     this.redraw();
@@ -303,3 +305,32 @@ HackerNews.prototype = common.mergeSettings(newsFunctions, {
 
 });
 
+var RSS = exports.RSS = function RSS(route) {
+  var url = this.url = decodeURIComponent(route.current.params.feed);
+  this.type = 'rss:' + url;
+};
+RSS.$inject = ['$route'];
+var yql = require('apollo:yql');
+
+RSS.prototype = common.mergeSettings(newsFunctions, {
+  super: newsFunctions,
+  reset: function() {
+    this.columns = [[],[],[],[]];
+    this.super.reset.call(this);
+  },
+  loadNewItems: function() {
+    var rv = yql.query("select * from feednormalizer where url = @url and output='atom_1.0'", {
+      url: this.url
+    });
+    logging.info("RSS feed entries: ",null, rv);
+    this.about = "Latest articles from \"" + rv.results.feed.title + "\" on " + dow[new Date().getDay()];
+    var entries = rv.results.feed.entry;
+    if(!entries) throw new Error("No entries found for feed " + this.url);
+    return entries;
+  },
+
+  processItem: function(item) {
+    logging.debug("processing feed entry: ", null, item);
+    this.processArticle(item.id, item.link.href, null, null, null);
+  }
+});

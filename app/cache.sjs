@@ -31,6 +31,13 @@ Cache.prototype = {
     return obj;
   },
 
+  all: function() {
+    waitfor(var all) {
+      this.db.all(resume);
+    }
+    return all;
+  },
+
   _keep: function(obj) {
     var key = obj.key;
     if(!key) {
@@ -41,6 +48,10 @@ Cache.prototype = {
       obj.key = key.toString();
     }
     this._seen[key] = true;
+  },
+
+  remove: function(key) {
+    waitfor() { this.db.remove(key, resume); }
   },
 
   flush: function() {
@@ -56,7 +67,7 @@ Cache.prototype = {
       }
     });
     logging.debug("removing {len} keys from {service}", {len: del_keys.length, service: this.service}, del_keys);
-    waitfor() { this.db.remove(del_keys, resume); }
+    this.remove(del_keys);
     waitfor(var items) { this.db.get(del_keys, resume); }
     if(items.length > 0) {
       logging.error("{length} cache items did not get deleted:" , items, items);
