@@ -251,7 +251,9 @@ a.tab {
     <a class="tab hackernews" href="#/hackernews">hacker news</a>
     <a class="tab twitter" href="#/twitter">your twitter</a>
   </div>
-  <div class="error" ng:show="news.error">Error: {{news.error.message}}. <button ng:click="news.rerun()">Try again</button>
+  <div class="error" ng:show="news.error">
+    Error: {{news.error.message}}.<br />
+    <button ng:click="news.rerun()">Try again</button>
   </div>
   <!-- view is detemined by the current App route -->
   <ng:view/>

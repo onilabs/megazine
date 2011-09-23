@@ -1,5 +1,6 @@
 var logging = require("apollo:logging");
 var common = require("apollo:common");
+var collection = require("apollo:collection");
 
 // increment VERSION when changing data model
 var VERSION = 1;
@@ -14,7 +15,7 @@ var Cache = exports.Cache = function Cache(service) {
 
 Cache.prototype = {
   save: function(obj) {
-    this._keep(obj.key);
+    this._keep(obj);
     waitfor() {
       obj._DB_VERSION = VERSION;
       this.db.save(obj, resume);
@@ -26,11 +27,15 @@ Cache.prototype = {
       this.db.get(key, resume);
     }
     if (!obj || obj._DB_VERSION != VERSION) return null;
-    this._keep(obj.key);
+    this._keep(obj);
     return obj;
   },
 
-  _keep: function(key) {
+  _keep: function(obj) {
+    var key = obj.key;
+    if(!key || (key.toString() !== key)) {
+      throw new Error("item persisted to " + this.service + " cache without a string key: " + JSON.stringify(obj));
+    }
     this._seen[key] = true;
   },
 
@@ -46,8 +51,12 @@ Cache.prototype = {
         del_keys.push(item.key);
       }
     });
-    logging.debug("removing {len} keys from {service}", {len: del_keys.length, service: this.service});
-    this.db.remove(del_keys);
+    logging.debug("removing {len} keys from {service}", {len: del_keys.length, service: this.service}, del_keys);
+    waitfor() { this.db.remove(del_keys, resume); }
+    waitfor(var items) { this.db.get(del_keys, resume); }
+    if(items.length > 0) {
+      logging.error("{length} cache items did not get deleted:" , items, items);
+    }
   }
 };
 

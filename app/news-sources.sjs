@@ -30,6 +30,7 @@ var newsFunctions = {
   _init: function() {
     this.reset();
     this.cache = new Cache(this.type);
+    this.appendMethod = 'push'; // start by putting new items at the bottom
   },
 
   processItems: function(items) {
@@ -62,11 +63,12 @@ var newsFunctions = {
             var items = this.loadNewItems();
           } or {
             hold(this.loadTimeout);
-            throw new Error("News items not received within " + Math.round(this.loadTimeout / 1000) + " seconds");
+            throw new Error(this.type + " items not received within " + Math.round(this.loadTimeout / 1000) + " seconds");
           }
         }
         var newItems = this.addNewItems(items);
         this.processItems(newItems);
+        this.appendMethod = 'unshift'; // future items get inserted above existing items
         hold(1000 * 60 * 2);
       }
     } catch(e) {
@@ -99,10 +101,18 @@ var newsFunctions = {
     idProp = idProp || 'id';
     var existingItems = this.items;
     var existingIds = underscore.pluck(existingItems, idProp);
-    var newIds = underscore.pluck(newItems, idProp);
+    var newIds = [];
+    c.each(newItems, function(item) {
+      var id = item[idProp];
+      if(!id) {
+        logging.warn("encountered item without ID - ignoring", null, item);
+      } else {
+        newIds.push(id);
+      }
+    });
 
     newIds = underscore.difference(newIds, existingIds);
-    newItems = underscore.select(newItems, function(t) { return underscore.include(newIds, t.id); });
+    newItems = underscore.select(newItems, function(t) { return underscore.include(newIds, t[idProp]); });
     this.items = existingItems.concat(newItems);
     return newItems;
   },
@@ -145,7 +155,7 @@ var newsFunctions = {
     var columnHeights = columns.map(function() { return $(this).height() }).get();
     var minColumnHeight = Math.min.apply(Math, columnHeights);
     var minColumnIndex = columnHeights.indexOf(minColumnHeight);
-    this.columns[minColumnIndex].push(article);
+    this.columns[minColumnIndex][this.appendMethod](article);
     this.redraw();
   }
 };
@@ -217,8 +227,8 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
 
     // strange that twitter doesn't provide this...
     tweet.url = s("http://twitter.com/#!/{user}/status/{id}",
-      {user:tweet.user.screenName, id:tweet.id});
-
+      {user:tweet.user.screenName, id:tweet.idStr});
+    
     if(!(links && links.length)) {
       this.linklessTweets.push(tweet);
       return;
