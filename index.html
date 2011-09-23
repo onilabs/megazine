@@ -16,11 +16,14 @@
 </script>
 <script type="text/sjs">
 require("apollo:jquery-binding").install();
+var Twitter = require("./app/news-sources").Twitter;
+
+// replace with your own application id:
+Twitter.prototype.appId = "JamxhlnS3WsCrdzQMblw";
 
 // install spinners in the background, as they're less important than actually loading
 spawn((function() {
   require("./lib/spin.min.js");
-  /* var spinContainer = $("<div class='spinner'/>"); */
   var spinContainer = $("#loading .spinner").empty();
   new Spinner().spin(spinContainer[0]);
   new Spinner({
@@ -32,10 +35,12 @@ spawn((function() {
 })());
 
 var logging = require("apollo:logging");
-logging.setLevel(logging.DEBUG);
+if(document.location.host.indexOf('127.0.0.1') !== -1) {
+  logging.setLevel(logging.DEBUG);
+}
 
 var megazine = window.megazine = require('./app/megazine');
-var Twitter = require("./app/news-sources").Twitter;
+
 logging.info("window.megazine = {megazine}", window)
 angular.compile(document)();
 if(document.location.hash == '') {
@@ -154,9 +159,13 @@ a.hide {
 .article:hover a.hide {
   display:block;
 }
-#login,#logout {
+#logout {
   float:right;
   margin: 30px;
+}
+#login {
+  margin:2em;
+  text-align:center;
 }
 #loading {
   width:100%;

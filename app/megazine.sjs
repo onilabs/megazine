@@ -3,9 +3,6 @@ var logging = require("apollo:logging");
 
 var NewsSources = require('./news-sources');
 
-// replace with your own application id:
-NewsSources.Twitter.prototype.appId = "hkEsBjNpWsOVKQ2gKyr1kQ";
-
 if(logging.isEnabled(logging.VERBOSE)) {
   // in debug mode, pop up an apollo console
   require("apollo:debug").console({receivelog:false});

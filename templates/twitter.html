@@ -1,3 +1,5 @@
+<div id="login" ng:hide="connected">
+</div>
 <div id="timeline">
   <div><ng:include src="'templates/columns.html'"/></div>
   <div class="tweets">
@@ -8,7 +10,6 @@
   </div>
 </div>
 
-<div id="login" ng:hide="connected"></div>
 <div id="logout" ng:show="connected">
   <button ng:click="triggerSignout()">Sign out of twitter</a>
 </div>
