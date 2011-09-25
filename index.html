@@ -9,12 +9,15 @@
 <link href='http://fonts.googleapis.com/css?family=Vollkorn' rel='stylesheet' type='text/css'>
 
 
-<script src="../oni-apollo.js"></script>
 <script src="lib/angular-0.9.19.min.js"></script>
 <script src="lib/lawnchair-0.6.1.min.js"></script>
 
-</script>
+<!-- TODO: make this a versioned URL once 0.13 is out -->
+<!-- <script src="../oni-apollo.js"></script> -->
+<script src="https://raw.github.com/onilabs/apollo/master/oni-apollo.js"></script>
 <script type="text/sjs">
+require.hubs.unshift(['apollo:', 'github:onilabs/apollo/master/modules/']);
+
 require("apollo:jquery-binding").install();
 var Twitter = require("./app/news-sources").Twitter;
 
