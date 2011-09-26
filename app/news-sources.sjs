@@ -40,6 +40,7 @@ var newsFunctions = {
     c.par.map(items, function(item) {
       using(this.workItem()) {
         this.processItem(item);
+        this.items.push(item);
       }
     }, this);
     this.flush_cache();
@@ -68,7 +69,7 @@ var newsFunctions = {
             throw new Error(this.type + " items not received within " + Math.round(this.loadTimeout / 1000) + " seconds");
           }
         }
-        var newItems = this.addNewItems(items);
+        var newItems = this.filterNewItems(items);
         this.processItems(newItems);
         this.appendMethod = 'unshift'; // future items get inserted above existing items
         hold(1000 * 60 * 2);
@@ -104,9 +105,8 @@ var newsFunctions = {
     };
   },
 
-  addNewItems: function(newItems, idProp){
-    // adds all new items to this.items, and returns only
-    // the items that haven't already been seen
+  filterNewItems: function(newItems, idProp){
+    // returns only the items that haven't already been seen
     idProp = idProp || 'id';
     var existingItems = this.items;
     var existingIds = underscore.pluck(existingItems, idProp);
@@ -122,7 +122,6 @@ var newsFunctions = {
 
     newIds = underscore.difference(newIds, existingIds);
     newItems = underscore.select(newItems, function(t) { return underscore.include(newIds, t[idProp]); });
-    this.items = existingItems.concat(newItems);
     return newItems;
   },
 
@@ -168,14 +167,15 @@ var newsFunctions = {
     this.columns[minColumnIndex][this.appendMethod](article);
   },
 
-  hideArticle: function(article) {
+  hideArticle: function(article, column) {
     logging.debug("hiding article: ", null, article);
     this.bg(function() {
       article.hidden = true;
-      this.cache.save(article);
-      c.each(this.columns, function(col) {
-        angular.Array.remove(col, article);
-      });
+      try {
+        this.cache.save(article);
+      } and {
+        angular.Array.remove(column, article);
+      }
     });
   },
 

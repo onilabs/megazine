@@ -38,7 +38,7 @@ spawn((function() {
 })());
 
 var logging = require("apollo:logging");
-if(document.location.host.indexOf('127.0.0.1') !== -1) {
+if(document.location.host.indexOf('127.0.0.1') !== -1 || document.location.host.indexOf('localhost') !== -1) {
   logging.setLevel(logging.DEBUG);
 }
 

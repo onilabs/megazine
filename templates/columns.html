@@ -1,7 +1,7 @@
 <!-- common news article layout -->
 <div class="col" ng:repeat="col in columns">
   <div class="article {{$position}}" ng:repeat="article in col">
-    <a class="hide" ng:click="hideArticle(article)">(hide article)</a>
+    <a class="hide" ng:click="hideArticle(article, col)">(hide article)</a>
     <div class="inner">
       <a ng:href="{{article.url}}">
         <h3 ng:show="article.heading.text">{{article.heading.text}}</h3>
