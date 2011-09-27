@@ -1,0 +1,218 @@
+body {
+  -webkit-font-smoothing: antialiased;
+  padding: 30px 30px 30px 15px;
+}
+#timeline {
+  margin: 0 auto;
+}
+
+#timeline .col, #timeline .tweets {
+  width:25%;
+  float:left;
+  overflow:hidden;
+}
+#timeline .col {
+  min-height:10px;
+}
+h1 {
+  margin:0 0 0px 0;
+  text-align:center;
+  font: 50px 'Vollkorn';
+}
+.article {
+  padding: 5px 5px 5px 5px;
+  padding-bottom: 30px;
+  display:block;
+  position:relative;
+}
+.article .inner {
+  border-top: 2px solid #eee;
+  padding: 10px 10px 10px 10px;
+}
+.article.first .inner {
+  border: none;
+}
+
+h3 {
+  font: 18px 'Vollkorn';
+  font-weight: normal;
+  margin: 0px 0 0 0;
+  line-height:24px;
+  display: block;
+}
+h3 a:visited {
+  color: #999; !important;
+}
+.tweets h3 {
+  margin: 15px 0 5px 15px;
+}
+.summary {
+  color: #666;
+  font-size: 0.9em;
+}
+.pointerText, .btweet {
+  font: 15px serif;
+  font-weight: normal;
+  line-height:20px;
+  color:#222  ;
+}
+.pointerText {
+  margin-bottom: 10px;
+}
+.tweets {
+  background: #fafafa;
+  margin-left:-1px;
+  border-left: 1px solid #f1f1f1;
+}
+.btweet {
+  padding: 10px 15px 5px 15px;
+  color: #222;
+}
+.article a,.btweet a {
+  color: #111;
+  text-decoration:none;
+}
+.content span{
+  color:#666;
+}
+.user, #about {
+  color: #666;
+  font-family:helvetica,sans-serif;
+  font-size: 13px;
+  margin-bottom:5px;
+}
+.illustration {
+  margin: 5px 0 5px 0;
+  width:100%;
+  height:120px;
+  /* !important decls below are a hack to get around angular.js bug #569 */
+  background-position:50% 50% !important;
+  background-size: 100% auto !important;
+  background-repeat: no-repeat !important;
+}
+a.hide {
+  display:none;
+  position: absolute;
+  right: 10px;
+  left: 10px;
+  bottom:15px;
+  color:#999;
+  text-align:center;
+}
+.article:hover a.hide {
+  display:block;
+}
+#logout {
+  float:right;
+  margin: 30px;
+}
+#login {
+  margin:2em;
+  text-align:center;
+}
+#loading {
+  width:100%;
+  height:100%;
+  position:absolute;
+  display:fixed;
+  top:0;
+  left:0;
+  background: #eee;
+  text-align:center;
+  z-index:999;
+  font-family: 'Vollkorn';
+  font-size:2em;
+}
+#loading .spinner {
+  color: #ccc;
+  position:fixed;
+  width:200px;
+  margin-left:-100px;
+  margin-top:-100px;
+  top:50%;
+  left: 50%;
+}
+#about {
+  display:block;
+  text-align:center;
+  margin: 0px 0 30px 0;
+}
+#unprocessedItems {
+  position:fixed;
+  top:0;
+  right:0;
+  padding:2px;
+  padding-right:24px;
+  padding-left:10px;
+  opacity:0.9;
+  color:#eee;
+  background:#555;
+  border-bottom-left-radius:5px;
+  z-index: 999;
+}
+#unprocessedItems .spinner {
+  display:block;
+  position:absolute;
+  top:13px;
+  right: 13px;
+}
+
+.tabbar {
+  border-bottom: 1px solid #ddd;
+}
+.tabbar a {
+  text-decoration:none;
+  color: #333;
+}
+.tabbar .tab {
+  z-index:50;
+  position:relative;
+  display:inline-block;
+  top:1px;
+  padding:5px 12px;
+  padding-bottom: 2px;
+  font-family: 'Vollkorn';
+  background: #ccc;
+  border-radius: 8px;
+  border:1px solid #aaa;
+  text-shadow: 0px 1px #eee;
+  border-bottom-left-radius:0;
+  border-bottom-right-radius:0;
+  border-bottom: none;
+}
+.tabbar .delete {
+  display:inline-block;
+  padding-left:5px;
+  background:none;
+  width:1em;
+  height:1em;
+  text-align:center;
+  color: #888;
+}
+
+.tabbar .tab.active_true {
+  color:black;
+  background:white;
+  border-color:#ddd;
+}
+.newRSS, .newRSS input {
+  font-family: 'Vollkorn';
+  font-size:1em;
+}
+.newRSS {
+  text-align:center;
+  padding:2em;
+}
+.error {
+  font-size: 1.5em;
+  color: #b33;
+  margin:20px 0;
+}
+@media screen and (max-width: 900px) {
+  #timeline .col {
+    width:33%;
+  }
+  #timeline .tweets {
+    width: 100%;
+  }
+}
