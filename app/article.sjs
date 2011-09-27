@@ -1,19 +1,50 @@
 var Content = require("./content-extraction");
 var logging = require("apollo:logging");
 var s = require("apollo:common").supplant;
+var underscore = require("../lib/underscore.js");
 
 // -------------------- Article object --------------------
 
-var Article = exports.Article = function(id, url, user, text, pointerURL) {
+// var Article = exports.Article = function(id, url, user, text, pointerURL) {
+var Article = exports.Article = function(props) {
+  props = underscore.clone(props);
+  function prop(name, _default) {
+    if(!(name in props)) {
+      if(_default !== undefined) return _default;
+      throw new Error("required property " + name + " not provided");
+    }
+    var val = props[name];
+    delete props[name];
+    return val;
+  }
+
+  var id = prop('id');
+  var user = prop('user', null);
+
   this.key = 'article_' + id.toString(); // workaround lawnchair bug #58
-  this.url = url;
-  this.users = [user];
-  this.pointerText = text;
-  this.pointerURL = pointerURL;
+  this.users = [];
+  if(user) this.users.push(user);
+
+  this.url = prop('url');
+  this.pointerText = prop('text', null);
+  this.pointerURL = prop('pointerURL', null);
+
+  this.contentOverrides = {
+    title: prop('title', null),
+    summary: prop('content', null)
+  };
+
+  if(underscore.keys(props).length > 0) {
+    throw new Error("unknown properties: " + underscore.keys(props).join(", "));
+  }
 };
 
 Article.prototype.addUser = function(user) {
   this.users.push(user);
+};
+
+Article.prototype.update = function(opts) {
+  if(opts.user) this.addUser(opts.user);
 };
 
 Article.prototype.userList = function() { return this.users.join(", "); };
@@ -29,6 +60,9 @@ Article.prototype.loadContent = function() {
     this.heading.text = this.url;
     return;
   }
+  logging.debug("got article contents for {url}:", this, contents);
+
+  if(this.contentOverrides.title) contents.title = this.contentOverrides.title;
   
   this.contents = contents;
   this.img = Content.extractImage(this.contents, this.url);
@@ -40,7 +74,7 @@ Article.prototype.loadContent = function() {
     this.contextImage = this.img;
     this.populateTitle();
   }
-  this.summary = this.getSummary();
+  this.summary = this.getSummary(this.contentOverrides.summary);
 };
 
 Article.prototype.toString = function() {
@@ -58,15 +92,19 @@ Article.prototype.populateTitle = function() {
   }
 };
 
-Article.prototype.getSummary = function() {
-  if(!(this.contents.meta && this.contents.meta.content)) return;
+Article.prototype.getSummary = function(override) {
+  var maxlen = 250;
+  var text = override || (this.contents.meta && this.contents.meta.content);
+  if(!text) return;
+  text = text.replace(/<[^>]*(>|$)/g, '')
   var summary = {
-    text: this.contents.meta.content,
+    text: text,
     style: {}
   };
 
-  if (summary.text.length > 300) {
+  if (summary.text.length > maxlen) {
     summary.style['text-align'] = "justify";
+    summary.text = summary.text.slice(0, maxlen).replace(/&[^;]*$/) + "&hellip;";
   }
   return summary;
 };

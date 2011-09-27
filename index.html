@@ -17,30 +17,52 @@
 <!-- <script src="../oni-apollo.js"></script> -->
 <script src="https://raw.github.com/onilabs/apollo/master/oni-apollo.js"></script>
 <script type="text/sjs">
-/* require.hubs.unshift(['apollo:', 'github:onilabs/apollo/master/modules/']); */
+require.hubs.unshift(['apollo:', 'github:onilabs/apollo/master/modules/']);
 
-require("apollo:jquery-binding").install();
+try {
+  require("apollo:jquery-binding").install();
+  // install spinners in the background, as they're less important than actually loading
+  spawn((function() {
+    require("./lib/spin.min.js");
+    var spinContainer = $("#loading .spinner").empty();
+    new Spinner().spin(spinContainer[0]);
+    new Spinner({
+      lines: 6,
+      length: 2,
+      width:3,
+      radius: 2,
+    }).spin($("#unprocessedItems .spinner")[0]);
+  })());
+} and {
+  // we're going to need all of these - might as well pre-fetch them in parallel
+  require("apollo:collection").par.map([
+    "apollo:common",
+    "apollo:yql",
+    "apollo:logging",
+    "./lib/underscore.js",
+    "apollo:http",
+    "./app/news-sources",
+    "./app/content-extraction",
+    "./app/article",
+    "./app/megazine",
+    "./app/cache"
+    ], require);
+}
+var common = require("apollo:common");
 var Twitter = require("./app/news-sources").Twitter;
 
 // replace with your own application id:
 Twitter.prototype.appId = "JamxhlnS3WsCrdzQMblw";
 
-// install spinners in the background, as they're less important than actually loading
-spawn((function() {
-  require("./lib/spin.min.js");
-  var spinContainer = $("#loading .spinner").empty();
-  new Spinner().spin(spinContainer[0]);
-  new Spinner({
-    lines: 6,
-    length: 2,
-    width:3,
-    radius: 2,
-  }).spin($("#unprocessedItems .spinner")[0]);
-})());
-
 var logging = require("apollo:logging");
 if(document.location.host.indexOf('127.0.0.1') !== -1 || document.location.host.indexOf('localhost') !== -1) {
   logging.setLevel(logging.DEBUG);
+  logging.defineField('time', function() {
+    var now = new Date();
+    return common.supplant("{getHours}:{getMinutes}:{getSeconds}.{getMilliseconds}", now);
+  });
+  logging.setFormat("{time}@ " + logging.getFormat());
+  require("apollo:debug").console({receivelog:false});
 }
 
 var megazine = window.megazine = require('./app/megazine');
@@ -301,7 +323,7 @@ a.hide {
     <a class="tab rss active_{{news.type == 'add-rss'}}" href="#/rss/new"><strong>+</strong></a>
   </div>
   <div class="error" ng:show="news.error">
-    {{news.error.message}}.<br />
+    Error: {{news.error.message}}.<br />
     <button ng:click="news.rerun()">Continue&hellip;</button>
   </div>
   <!-- view is detemined by the current App route -->

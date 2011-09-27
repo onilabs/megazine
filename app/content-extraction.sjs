@@ -77,7 +77,6 @@ function getBestImage(images, baseURL) {
   var seenSources = [];
   images = c.filter(images, function(img) {
     if(!img.src || underscore.include(seenSources, img.src)) {
-      logging.debug("ignoring img with src: {src}", img);
       return false;
     }
     seenSources.push(img.src);
@@ -151,7 +150,7 @@ function guessImageSize(img) {
   }
 };
 
-var loadImage = exports.loadImage = function(url, timeout) {
+var loadImage = exports.loadImage = cutil.makeMemoizedFunction(function(url, timeout) {
   var domImg = new Image();
   timeout = timeout || 5;
   try {
@@ -165,7 +164,7 @@ var loadImage = exports.loadImage = function(url, timeout) {
     hold(timeout * 1000);
     throw new Error("Image " + url + " failed to load in " + timeout + "s");
   }
-};
+});
 
 
 function isImageService(url) {

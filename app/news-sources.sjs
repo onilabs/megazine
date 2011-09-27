@@ -99,6 +99,7 @@ var newsFunctions = {
     // context manager to keep track of the number of currently-executing blocking tasks
     var self = this;
     self.unprocessedItems++;
+    self.redraw();
     return {
       __finally__: function() {
         self.unprocessedItems--;
@@ -127,11 +128,17 @@ var newsFunctions = {
     return newItems;
   },
 
-  processArticle: function(id, url, user, text, pointerURL) {
+  // processArticle: function(id, url, user, text, pointerURL) {
+  processArticle: function(opts) {
+    var url = opts.url;
+    var id = opts.id;
+    if(!url) throw new Error("no URL given in article");
+    if(!id) throw new Error("no ID given in article");
+
     if (!this.articles[url]) {
       // create and load in two steps, since the load step is blocking
       // and we want to make sure this.articles[url] is set immediately
-      var article = this.articles[url] = new Article(id, url, user, text, pointerURL);
+      var article = this.articles[url] = new Article(opts);
       logging.debug("getting article", null, article);
       var cached = this.cache.get(id);
       if(cached) {
@@ -144,7 +151,7 @@ var newsFunctions = {
       this.showArticle(article);
     } else {
       // article already exists; just add this user to its references
-      this.articles[url].addUser(user);
+      this.articles[url].update(opts);
     }
   },
 
@@ -233,7 +240,7 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
   },
 
   run: function() {
-    // overrise super.run() to ensure we're connected first
+    // override super.run() to ensure we're connected first
     while(true) {
       this.awaitAuth();
       this.redraw();
@@ -272,7 +279,13 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
     // expand URL if needed
     url = Content.getExpandedURL(url, this.url_cache);
     
-    this.processArticle(tweet.id, url, tweet.user.name, tweet.text, tweet.url);
+    this.processArticle({
+      id: tweet.id,
+      url: url,
+      user: tweet.user.name,
+      text: tweet.text,
+      pointerURL: tweet.url
+    });
   },
 
   flush_cache: function() {
@@ -300,7 +313,13 @@ HackerNews.prototype = common.mergeSettings(newsFunctions, {
   processItem: function(item) {
     logging.debug("processing item: ",null, item);
     var commentUrl = s("http://news.ycombinator.com/item?id={id}", item);
-    this.processArticle(item.id, item.url, item.postedBy, item.title, commentUrl);
+    this.processArticle({
+      id: item.id,
+      url: item.url,
+      user: item.postedBy,
+      text: item.title,
+      pointerURL: commentUrl
+    });
   },
 
 });
@@ -331,6 +350,14 @@ RSS.prototype = common.mergeSettings(newsFunctions, {
 
   processItem: function(item) {
     logging.debug("processing feed entry: ", null, item);
-    this.processArticle(item.id, item.link.href, null, null, null);
+    var content = null;
+    if(item.summary && item.summary.content) content = item.summary.content;
+    if(item.content && item.content.content) content = item.content.content;
+    this.processArticle({
+      id: item.id,
+      url: item.link.href,
+      title: item.title,
+      content: content
+    });
   }
 });

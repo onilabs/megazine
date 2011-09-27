@@ -21,7 +21,7 @@
       <div class="summary"
         ng:show="article.summary"
         ng:style="article.summary.style">
-        {{article.summary.text}}
+        {{article.summary.text | html}}
       </div>
     </div>
   </div>
