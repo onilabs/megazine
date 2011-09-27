@@ -205,12 +205,12 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
 
   _init: function() {
     logging.info("twitter initializing");
-    this.loading = true;
-    this.twitter = require("apollo:twitter").initAnywhere({id:this.appId});
-    this.twitter("#login").connectButton();
-    this.loading = false;
-    this.url_cache = new Cache("twitter_urls");
     this.super._init.call(this);
+    using(this.workItem()) {
+      this.twitter = require("apollo:twitter").initAnywhere({id:this.appId});
+      this.twitter("#login").connectButton();
+    }
+    this.url_cache = new Cache("twitter_urls");
   },
   reset: function() {
     this.columns = [[],[],[]];

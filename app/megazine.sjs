@@ -38,8 +38,6 @@ App.prototype.run = function() {
 
     if(!(route.current && route.current.scope)) {
       logging.debug("route changed with no current scope: ", null, route.current);
-      this.news = { error: new Error("Unknown news source. Click a tab above")};
-      this.$root.$eval();
       continue;
     }
     logging.debug("new route:", null, route.current);
