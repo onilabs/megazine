@@ -46,6 +46,9 @@ App.prototype.run = function() {
 
     // init the scope, and run it in the background:
     this.news = route.current.scope;
+
+    // for debugging
+    window.news = this.news;
     this.$root.$eval();
     if(this.news._init) {
       this.news._init();

@@ -25,7 +25,7 @@ var newsFunctions = {
     this.title = this.getTitle();
   },
   
-  loadTimeout: 5000,
+  loadTimeout: 7000,
 
   _init: function() {
     this.reset();
@@ -131,16 +131,14 @@ var newsFunctions = {
   // processArticle: function(id, url, user, text, pointerURL) {
   processArticle: function(opts) {
     var url = opts.url;
-    var id = opts.id;
     if(!url) throw new Error("no URL given in article");
-    if(!id) throw new Error("no ID given in article");
 
     if (!this.articles[url]) {
       // create and load in two steps, since the load step is blocking
       // and we want to make sure this.articles[url] is set immediately
       var article = this.articles[url] = new Article(opts);
       logging.debug("getting article", null, article);
-      var cached = this.cache.get(id);
+      var cached = this.cache.get(article.key);
       if(cached) {
         logging.verbose("using cached article for URL " + url);
         underscore.extend(article, cached);

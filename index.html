@@ -61,14 +61,12 @@ if(document.location.host.indexOf('127.0.0.1') !== -1 || document.location.host.
     var now = new Date();
     return common.supplant("{getHours}:{getMinutes}:{getSeconds}.{getMilliseconds}", now);
   });
-  logging.setFormat("{time}@ " + logging.getFormat());
+  logging.setFormat("{time}|" + logging.getFormat());
   require("apollo:debug").console({receivelog:false});
 }
 
 var megazine = window.megazine = require('./app/megazine');
 angular.filter.escapeURI = function(str) { return encodeURIComponent(str); }
-
-logging.info("window.megazine = {megazine}", window)
 angular.compile(document)();
 if(document.location.hash == '') {
   document.location.hash = '#/hackernews';
@@ -170,9 +168,10 @@ h3 a:visited {
   margin: 5px 0 5px 0;
   width:100%;
   height:120px;
-  background-position:50% 50%;
-  background-size: 100% auto;
-  background-repeat: no-repeat;
+  /* !important decls below are a hack to get around angular.js bug #569 */
+  background-position:50% 50% !important;
+  background-size: 100% auto !important;
+  background-repeat: no-repeat !important;
 }
 a.hide {
   display:none;

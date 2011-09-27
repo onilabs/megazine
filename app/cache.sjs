@@ -26,6 +26,11 @@ Cache.prototype = {
     waitfor(var obj) {
       this.db.get(key, resume);
     }
+    logging.debug("cache {status}: {key} [{name}]", {
+      status: obj ? 'HIT' : 'MISS',
+      key: key,
+      name: this.service
+    });
     if (!obj || obj._DB_VERSION != VERSION) return null;
     this._keep(obj);
     return obj;
@@ -70,7 +75,9 @@ Cache.prototype = {
     this.remove(del_keys);
     waitfor(var items) { this.db.get(del_keys, resume); }
     if(items.length > 0) {
-      logging.error("{length} cache items did not get deleted:" , items, items);
+      logging.error("{length} cache items did not get deleted from collection {service}:" , {
+        length: items.length,
+        service: this.service}, items);
     }
   }
 };

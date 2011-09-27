@@ -178,7 +178,8 @@ var ArticleImage = exports.ArticleImage = function ArticleImage(src, imgService)
   this.src = src;
   this.imgService = imgService;
   this.style = {
-    'background-image': s('url({src})', this),
+    /* TODO: should be 'background-image'. This is a hack to get around angular.js bug #569 */
+    'background': s('url({src})', this)
   };
   if(imgService) {
     this.style.height = 200;
