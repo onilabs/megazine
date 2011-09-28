@@ -72,7 +72,7 @@ Cache.prototype = {
       }
     });
     logging.debug("removing {len} keys from {service}", {len: del_keys.length, service: this.service}, del_keys);
-    this.remove(del_keys);
+    collection.par.each(del_keys, this.remove, this);
     waitfor(var items) { this.db.get(del_keys, resume); }
     if(items.length > 0) {
       logging.error("{length} cache items did not get deleted from collection {service}:" , {

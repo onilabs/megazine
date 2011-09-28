@@ -13,9 +13,111 @@ var Cache = require("./cache").Cache;
 
 var dow = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
+function StrataPool() {
+  this.error = new cutil.Event();
+  this.reset();
+};
+StrataPool.prototype = {
+  abort: function(error) {
+    if(this.aborting) return;
+    this.aborting = true;
+    c.each(this.strata, function(strata, idx) { strata.abort(); });
+    this.strata = [];
+    if(error) {
+      logging.error("Error in StrataPool: ", null, error);
+      this.error.set(error);
+    }
+    this.aborting = false;
+    this._changed();
+  },
+
+  reset: function() {
+    if(this.strata && this.strata.length > 0) {
+      this.abort();
+    }
+    this.aborting = false;
+    this.strata = [];
+    this.error.clear();
+    this.changeListeners = [];
+    this.completionListeners = [];
+    this.size = 0;
+  },
+
+  run: function(fn, _this) {
+    var strata = this.add(fn,_this);
+    return strata.waitforValue();
+  },
+
+  add: function(fn, _this, cb) {
+    var strata;
+    var task = function() {
+      hold(0); // ensure strata makes it into `this.strata` immediately
+      var err = undefined;
+      var result;
+      try {
+        result = fn.call(_this);
+      } catch(e) {
+        err = e;
+      }
+      var sidx = this.strata.indexOf(strata);
+      this.strata.splice(sidx, 1);
+      if(err !== undefined) {
+        this.abort(err);
+        return;
+      }
+      this._changed();
+      if(cb) { cb.call(_this, result); }
+    };
+    strata = spawn(task.call(this));
+    this.strata.push(strata);
+    this._changed();
+    return strata;
+  },
+
+  _changed: function() {
+    var self = this;
+    this.size = this.strata.length;
+    c.each(this.changeListeners, function(f) { f(self); });
+    if(this.size == 0) {
+      this._emptied();
+    }
+  },
+
+  _emptied: function() {
+    c.each(this.emptyListeners, function(f) { f(self, self.error.value); });
+  },
+
+  onEmpty: function(f) {
+    this.emptyListeners.push(f);
+  },
+
+  onChange: function(f) {
+    this.changeListeners.push(f);
+  },
+
+  removeChangeListener: function(f) {
+    var idx = this.changeListeners.indexOf(f);
+    if(idx > -1) {
+      this.changeListeners.splice(idx,1);
+    }
+  },
+  removeEmptyListener: function(f) {
+    var idx = this.emptyListeners.indexOf(f);
+    if(idx > -1) {
+      this.emptyListeners.splice(idx,1);
+    }
+  },
+};
+
 var newsFunctions = {
   // methods common across all news sources (twitter, hackernews, ...)
   reset: function() {
+    this.pool.reset();
+    var self = this;
+    this.pool.onChange(function() {
+      self.redraw();
+    });
+
     this.articles = {};
     this.title = 'The news';
     this.about=null;
@@ -28,20 +130,20 @@ var newsFunctions = {
   loadTimeout: 7000,
 
   _init: function() {
-    this.reset();
+    this.pool = new StrataPool();
     this.cache = new Cache(this.type);
     this.appendMethod = 'push'; // start by putting new items at the bottom
-    this.errorEvent = new cutil.Event();
+    this.reset();
   },
 
   processItems: function(items) {
-    // process each item, wrapped in a `work item` to show
+    // process each item, wrapped in the strata pool to show
     // the number of pending items in the UI
     c.par.map(items, function(item) {
-      using(this.workItem()) {
+      this.pool.run(function() {
         this.processItem(item);
         this.items.push(item);
-      }
+      }, this);
     }, this);
     this.flush_cache();
   },
@@ -51,61 +153,38 @@ var newsFunctions = {
   },
 
   rerun: function() {
-    this.error = null;
     spawn(this.run());
   },
 
   run: function() {
-    this.errorEvent.clear();
     try {
       // keep loading new items every 2 mins
       while(true) {
         this.title = this.getTitle();
-        using(this.workItem()) {
+        var newItems;
+        this.pool.run(function() {
           try {
             var items = this.loadNewItems();
           } or {
             hold(this.loadTimeout);
             throw new Error(this.type + " items not received within " + Math.round(this.loadTimeout / 1000) + " seconds");
           }
-        }
-        var newItems = this.filterNewItems(items);
+          newItems = this.filterNewItems(items);
+        }, this);
         this.processItems(newItems);
         this.appendMethod = 'unshift'; // future items get inserted above existing items
         hold(1000 * 60 * 2);
       }
     } or {
-      this.errorEvent.wait();
+      this.pool.error.wait();
     } catch(e) {
-      this.setError(e);
+      this.pool.abort(e);
     }
-  },
-
-  setError: function(e) {
-    if(!(e instanceof Error)) { e = new Error(e); }
-    logging.error("Error loading news: {message}", e, e);
-    this.error = e;
-    this.errorEvent.set();
-    this.redraw();
-    throw(e);
   },
 
   getTitle: function() {
     var date = new Date();
     return "The "+(date.getHours()||12)+" O'Clock News";
-  },
-
-  workItem: function() {
-    // context manager to keep track of the number of currently-executing blocking tasks
-    var self = this;
-    self.unprocessedItems++;
-    self.redraw();
-    return {
-      __finally__: function() {
-        self.unprocessedItems--;
-        self.redraw();
-      }
-    };
   },
 
   filterNewItems: function(newItems, idProp){
@@ -176,7 +255,7 @@ var newsFunctions = {
 
   hideArticle: function(article, column) {
     logging.debug("hiding article: ", null, article);
-    this.bg(function() {
+    this.pool.add(function() {
       article.hidden = true;
       try {
         this.cache.save(article);
@@ -184,18 +263,8 @@ var newsFunctions = {
         angular.Array.remove(column, article);
       }
     });
-  },
-
-  bg: function(action) {
-    spawn((function() {
-      try {
-        action.call(this);
-      } catch (e) {
-        this.setError(e);
-      }
-      this.redraw();
-    }).call(this));
   }
+
 };
 
 var Twitter = exports.Twitter = function Twitter() {};
@@ -206,10 +275,10 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
   _init: function() {
     logging.info("twitter initializing");
     this._super._init.call(this);
-    using(this.workItem()) {
+    this.pool.run(function() {
       this.twitter = require("apollo:twitter").initAnywhere({id:this.appId});
       this.twitter("#login").connectButton();
-    }
+    }, this);
     this.url_cache = new Cache("twitter_urls");
   },
   reset: function() {

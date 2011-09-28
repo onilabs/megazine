@@ -93,7 +93,7 @@ if(document.location.hash == '') {
   <div style="display:none" ng:show="news">
     <h1>{{news.title}}</h1>
     <div id="about">{{news.about}}</div>
-    <h3 id="unprocessedItems" style="display:none;" ng:show="news.unprocessedItems"><div class="spinner"></div>loading {{news.unprocessedItems}} items</h3>
+    <h3 id="unprocessedItems" style="display:none;" ng:show="news.pool.size"><div class="spinner"></div>loading {{news.pool.size}} items</h3>
     <div class="tabbar" ng:show="news">
       <a class="tab hackernews active_{{news.type == 'hackernews'}}" href="#/hackernews">hacker news</a>
       <a class="tab twitter active_{{news.type == 'twitter'}}" href="#/twitter">your twitter</a>
@@ -105,8 +105,8 @@ if(document.location.hash == '') {
       </span>
       <a class="tab rss active_{{news.type == 'add-rss'}}" href="#/rss/new"><strong>+</strong></a>
     </div>
-    <div class="error" ng:show="news.error">
-      Error: {{news.error.message}}.<br />
+    <div class="error" ng:show="news.pool.error.isSet">
+      Error: {{news.pool.error.value.message}}.<br />
       <button ng:click="news.rerun()">Continue&hellip;</button>
     </div>
     <!-- view is detemined by the current App route -->
