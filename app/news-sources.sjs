@@ -200,12 +200,12 @@ var newsFunctions = {
 
 var Twitter = exports.Twitter = function Twitter() {};
 Twitter.prototype = common.mergeSettings(newsFunctions, {
-  super: newsFunctions,
+  _super: newsFunctions,
   type:'twitter',
 
   _init: function() {
     logging.info("twitter initializing");
-    this.super._init.call(this);
+    this._super._init.call(this);
     using(this.workItem()) {
       this.twitter = require("apollo:twitter").initAnywhere({id:this.appId});
       this.twitter("#login").connectButton();
@@ -217,7 +217,7 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
     this.signoutEvent = new cutil.Event();
     this.linklessTweets = [];
     this.connected = false;
-    this.super.reset.call(this);
+    this._super.reset.call(this);
   },
 
   loadNewItems: function() {
@@ -238,12 +238,12 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
   },
 
   run: function() {
-    // override super.run() to ensure we're connected first
+    // override _super.run() to ensure we're connected first
     while(true) {
       this.awaitAuth();
       this.redraw();
       waitfor {
-        this.super.run.call(this);
+        this._super.run.call(this);
       } or {
         this.signoutEvent.wait();
         collapse;
@@ -287,19 +287,19 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
   },
 
   flush_cache: function() {
-    this.super.flush_cache.call(this);
+    this._super.flush_cache.call(this);
     this.url_cache.flush();
   }
 });
 
 var HackerNews = exports.HackerNews = function HackerNews() {}
 HackerNews.prototype = common.mergeSettings(newsFunctions, {
-  super: newsFunctions,
+  _super: newsFunctions,
   type: 'hackernews',
 
   reset: function() {
     this.columns = [[],[],[],[]];
-    this.super.reset.call(this);
+    this._super.reset.call(this);
   },
 
   loadNewItems: function() {
@@ -330,10 +330,10 @@ RSS.$inject = ['$route'];
 var yql = require('apollo:yql');
 
 RSS.prototype = common.mergeSettings(newsFunctions, {
-  super: newsFunctions,
+  _super: newsFunctions,
   reset: function() {
     this.columns = [[],[],[],[]];
-    this.super.reset.call(this);
+    this._super.reset.call(this);
   },
   loadNewItems: function() {
     var rv = yql.query("select * from feednormalizer where url = @url and output='atom_1.0'", {
