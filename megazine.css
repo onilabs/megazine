@@ -209,10 +209,15 @@ a.hide {
   margin:20px 0;
 }
 @media screen and (max-width: 900px) {
-  #timeline .col {
-    width:33%;
+  body {
+    padding:0;
   }
-  #timeline .tweets {
+  h1 {
+    font-size: 25px;
+  }
+}
+@media screen and (max-width: 600px) {
+  #timeline .col, #timeline .tweets {
     width: 100%;
   }
 }
