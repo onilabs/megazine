@@ -10,114 +10,15 @@ var Article = require('article').Article;
 var underscore = require("../lib/underscore.js");
 var Content = require("./content-extraction");
 var Cache = require("./cache").Cache;
+var StrataPool = require('./strata-pool').StrataPool;
 
 var dow = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-
-function StrataPool() {
-  this.error = new cutil.Event();
-  this.reset();
-};
-StrataPool.prototype = {
-  abort: function(error) {
-    if(this.aborting) return;
-    this.aborting = true;
-    c.each(this.strata, function(strata, idx) { strata.abort(); });
-    this.strata = [];
-    if(error) {
-      logging.error("Error in StrataPool: ", null, error);
-      this.error.set(error);
-    }
-    this.aborting = false;
-    this._changed();
-  },
-
-  reset: function() {
-    if(this.strata && this.strata.length > 0) {
-      this.abort();
-    }
-    this.aborting = false;
-    this.strata = [];
-    this.error.clear();
-    this.changeListeners = [];
-    this.completionListeners = [];
-    this.size = 0;
-  },
-
-  run: function(fn, _this) {
-    var strata = this.add(fn,_this);
-    return strata.waitforValue();
-  },
-
-  add: function(fn, _this, cb) {
-    var strata;
-    var task = function() {
-      hold(0); // ensure strata makes it into `this.strata` immediately
-      var err = undefined;
-      var result;
-      try {
-        result = fn.call(_this);
-      } catch(e) {
-        err = e;
-      }
-      var sidx = this.strata.indexOf(strata);
-      this.strata.splice(sidx, 1);
-      if(err !== undefined) {
-        this.abort(err);
-        return;
-      }
-      this._changed();
-      if(cb) { cb.call(_this, result); }
-    };
-    strata = spawn(task.call(this));
-    this.strata.push(strata);
-    this._changed();
-    return strata;
-  },
-
-  _changed: function() {
-    var self = this;
-    this.size = this.strata.length;
-    c.each(this.changeListeners, function(f) { f(self); });
-    if(this.size == 0) {
-      this._emptied();
-    }
-  },
-
-  _emptied: function() {
-    c.each(this.emptyListeners, function(f) { f(self, self.error.value); });
-  },
-
-  onEmpty: function(f) {
-    this.emptyListeners.push(f);
-  },
-
-  onChange: function(f) {
-    this.changeListeners.push(f);
-  },
-
-  removeChangeListener: function(f) {
-    var idx = this.changeListeners.indexOf(f);
-    if(idx > -1) {
-      this.changeListeners.splice(idx,1);
-    }
-  },
-  removeEmptyListener: function(f) {
-    var idx = this.emptyListeners.indexOf(f);
-    if(idx > -1) {
-      this.emptyListeners.splice(idx,1);
-    }
-  },
-};
 
 var newsFunctions = {
   // methods common across all news sources (twitter, hackernews, ...)
   reset: function() {
     this.pool.reset();
     var self = this;
-    this.pool.onChange(function() {
-      self.redraw();
-    });
-
     this.articles = {};
     this.title = 'The news';
     this.about=null;
@@ -177,6 +78,11 @@ var newsFunctions = {
       }
     } or {
       this.pool.error.wait();
+    } or {
+      while (true) {
+        this.pool.change.wait();
+        this.redraw();
+      }
     } catch(e) {
       this.pool.abort(e);
     }
