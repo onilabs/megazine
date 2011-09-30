@@ -8,78 +8,81 @@
 <meta name="viewport" content="initial-scale = 1.0,maximum-scale = 1.0,width=device-width" />
 <link href='http://fonts.googleapis.com/css?family=Vollkorn' rel='stylesheet' type='text/css'>
 
-
-<!-- <script src="lib/angular-0.9.19.min.js"></script> -->
-<script src="lib/angular-0.9.19.js"></script>
 <script src="lib/lawnchair-0.6.1.min.js"></script>
+<script src="lib/angular-0.9.19.min.js"></script>
 
 <!-- TODO: make this a versioned URL once 0.13 is out -->
 <!-- <script src="../oni-apollo.js"></script> -->
 <script src="https://raw.github.com/onilabs/apollo/master/oni-apollo.js"></script>
 <script type="text/sjs">
-require.hubs.unshift(['apollo:', 'github:onilabs/apollo/master/modules/']);
-
 try {
-  require("apollo:jquery-binding").install();
-  // install spinners in the background, as they're less important than actually loading
-  spawn((function() {
-    require("./lib/spin.min.js");
-    var spinContainer = $("#loading .spinner").empty();
-    new Spinner().spin(spinContainer[0]);
-    new Spinner({
-      lines: 8,
-      length: 3,
-      width:2,
-      color: '#fff',
-      radius: 2,
-    }).spin($("#unprocessedItems .spinner")[0]);
-  })());
-} and {
-  // we're going to need all of these - might as well pre-fetch them in parallel
-  require("apollo:collection").par.map([
-    "apollo:common",
-    "apollo:yql",
-    "apollo:logging",
-    "./lib/underscore.js",
-    "apollo:http",
-    "./app/news-sources",
-    "./app/content-extraction",
-    "./app/article",
-    "./app/megazine",
-    "./app/cache"
-    ], require);
+  require.hubs.unshift(['apollo:', 'github:onilabs/apollo/master/modules/']);
+
+  try {
+    require("apollo:jquery-binding").install();
+    // install spinners in the background, as they're less important than actually loading
+    spawn((function() {
+      require("./lib/spin.min.js");
+      var spinContainer = $("#loading .spinner").empty();
+      new Spinner().spin(spinContainer[0]);
+      new Spinner({
+        lines: 8,
+        length: 3,
+        width:2,
+        color: '#fff',
+        radius: 2,
+      }).spin($("#unprocessedItems .spinner")[0]);
+    })());
+  } and {
+    // we're going to need all of these - might as well pre-fetch them in parallel
+    require("apollo:collection").par.map([
+      "apollo:common",
+      "apollo:yql",
+      "apollo:logging",
+      "./lib/underscore.js",
+      "apollo:http",
+      "./app/news-sources",
+      "./app/content-extraction",
+      "./app/article",
+      "./app/megazine",
+      "./app/cache"
+      ], require);
+  }
+  var common = require("apollo:common");
+  var Twitter = require("./app/news-sources").Twitter;
+
+  // replace with your own application id:
+  Twitter.prototype.appId = "JamxhlnS3WsCrdzQMblw";
+
+  var logging = require("apollo:logging");
+  if(document.location.host.indexOf('127.0.0.1') !== -1 || document.location.host.indexOf('localhost') !== -1) {
+    logging.setLevel(logging.DEBUG);
+    logging.defineField('time', function() {
+      var now = new Date();
+      return common.supplant("{getHours}:{getMinutes}:{getSeconds}.{getMilliseconds}", now);
+    });
+    logging.setFormat("{time}|" + logging.getFormat());
+    require("apollo:debug").console({receivelog:false});
+  }
+
+  var megazine = window.megazine = require('./app/megazine');
+  angular.filter.escapeURI = function(str) { return encodeURIComponent(str); }
+  angular.compile(document)();
+  if(document.location.hash == '') {
+    document.location.hash = '#/hackernews';
+  } else if(document.location.hash.indexOf("oauth") !== -1) {
+    // twitter oauth callback doesn't go to #/twitter, but
+    // we need the twitter controller to run in order to
+    // process the response
+    var twitter = new Twitter();
+    twitter._init();
+    twitter.awaitAuth();
+  };
+
+} catch (e) {
+  document.write(e);
+  throw e;
 }
-var common = require("apollo:common");
-var Twitter = require("./app/news-sources").Twitter;
-
-// replace with your own application id:
-Twitter.prototype.appId = "JamxhlnS3WsCrdzQMblw";
-
-var logging = require("apollo:logging");
-if(document.location.host.indexOf('127.0.0.1') !== -1 || document.location.host.indexOf('localhost') !== -1) {
-  logging.setLevel(logging.DEBUG);
-  logging.defineField('time', function() {
-    var now = new Date();
-    return common.supplant("{getHours}:{getMinutes}:{getSeconds}.{getMilliseconds}", now);
-  });
-  logging.setFormat("{time}|" + logging.getFormat());
-  require("apollo:debug").console({receivelog:false});
-}
-
-var megazine = window.megazine = require('./app/megazine');
-angular.filter.escapeURI = function(str) { return encodeURIComponent(str); }
-angular.compile(document)();
-if(document.location.hash == '') {
-  document.location.hash = '#/hackernews';
-} else if(document.location.hash.indexOf("oauth") !== -1) {
-  // twitter oauth callback doesn't go to #/twitter, but
-  // we need the twitter controller to run in order to
-  // process the response
-  var twitter = new Twitter();
-  twitter._init();
-  twitter.awaitAuth();
-};
-
 </script>
 <link rel="stylesheet" type="text/css" href="./megazine.css" />
 </head>

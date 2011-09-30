@@ -2,9 +2,9 @@ var cutil = require("apollo:cutil");
 var c = require("apollo:collection");
 
 var StrataPool = exports.StrataPool = function StrataPool() {
-  this.error = new cutil.Event();
+  this.error = new cutil.Condition();
   this.change = new cutil.Event();
-  this.empty = new cutil.Event();
+  this.empty = new cutil.Condition();
   this.reset();
 };
 
@@ -25,11 +25,10 @@ StrataPool.prototype = {
     if(this.strata && this.strata.length > 0) {
       this.abort();
     }
-    this.change.clear();
     this.empty.clear();
+    this.error.clear();
     this._aborting = false;
     this.strata = [];
-    this.error.clear();
     this.size = 0;
   },
 
@@ -46,16 +45,17 @@ StrataPool.prototype = {
       var result;
       try {
         result = fn.call(_this);
+        if(cb) { cb.call(_this, result); }
       } catch(e) {
         err = e;
+      } finally {
+        c.remove(this.strata, strata);
+        this._changed();
+        if(err !== undefined) {
+          this.abort(err);
+          throw err;
+        }
       }
-      c.remove(this.strata, strata);
-      if(err !== undefined) {
-        this.abort(err);
-        return;
-      }
-      this._changed();
-      if(cb) { cb.call(_this, result); }
     };
     strata = spawn(task.call(this));
     this.strata.push(strata);
@@ -66,13 +66,12 @@ StrataPool.prototype = {
   _changed: function() {
     var self = this;
     this.size = this.strata.length;
-    this.change.set();
-    this.change.clear();
     if(this.size == 0) {
       this.empty.set();
     } else {
       this.empty.clear();
     }
+    this.change.emit();
   }
 };
 

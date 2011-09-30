@@ -58,6 +58,7 @@ var newsFunctions = {
   },
 
   run: function() {
+    this.pool.reset();
     try {
       // keep loading new items every 2 mins
       while(true) {
@@ -85,6 +86,8 @@ var newsFunctions = {
       }
     } catch(e) {
       this.pool.abort(e);
+    } finally {
+      this.redraw();
     }
   },
 
@@ -168,7 +171,7 @@ var newsFunctions = {
       } and {
         angular.Array.remove(column, article);
       }
-    });
+    }, this);
   }
 
 };
@@ -189,7 +192,7 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
   },
   reset: function() {
     this.columns = [[],[],[]];
-    this.signoutEvent = new cutil.Event();
+    this.signoutEvent = new cutil.Condition();
     this.linklessTweets = [];
     this.connected = false;
     this._super.reset.call(this);
