@@ -148,7 +148,7 @@ var newsFunctions = {
       return;
     }
     this.$root.$eval();
-    hold(0);
+//    hold(0);
   },
 
   showArticle: function(article) {

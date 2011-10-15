@@ -33,14 +33,14 @@ StrataPool.prototype = {
   },
 
   run: function(fn, _this) {
-    var strata = this.add(fn,_this);
-    return strata.waitforValue();
+    var stratum = this.add(fn,_this);
+    return stratum.waitforValue();
   },
 
   add: function(fn, _this, cb) {
-    var strata;
+    var stratum;
     var task = function() {
-      hold(0); // ensure strata makes it into `this.strata` and gets returned immediately
+      hold(0); // ensure stratum makes it into `this.strata` and gets returned immediately
       var err = undefined;
       var result;
       try {
@@ -49,21 +49,23 @@ StrataPool.prototype = {
       } catch(e) {
         err = e;
       } finally {
-        c.remove(this.strata, strata);
+        c.remove(this.strata, stratum);
         this._changed();
         if(err !== undefined) {
           this.abort(err);
           throw err;
         }
       }
+      hold(0); 
     };
-    strata = spawn(task.call(this));
-    this.strata.push(strata);
+    stratum = spawn(task.call(this));
+    this.strata.push(stratum);
     this._changed();
-    return strata;
+    return stratum;
   },
 
   _changed: function() {
+    console.log('change '+this.strata.length);
     var self = this;
     this.size = this.strata.length;
     if(this.size == 0) {
