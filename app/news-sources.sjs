@@ -176,6 +176,7 @@ var newsFunctions = {
 };
 
 var Twitter = exports.Twitter = function Twitter() {};
+Twitter.anywhere = null;
 Twitter.prototype = common.mergeSettings(newsFunctions, {
   _super: newsFunctions,
   type:'twitter',
@@ -184,7 +185,10 @@ Twitter.prototype = common.mergeSettings(newsFunctions, {
     logging.info("twitter initializing");
     this._super._init.call(this);
     this.pool.run(function() {
-      this.twitter = require("apollo:twitter").initAnywhere({id:this.appId});
+      if(!Twitter.anywhere) {
+        Twitter.anywhere = require("apollo:twitter").initAnywhere({id:this.appId});
+      }
+      this.twitter = Twitter.anywhere;
       this.twitter("#login").connectButton();
     }, this);
     this.url_cache = new Cache("twitter_urls");
