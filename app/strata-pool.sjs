@@ -12,7 +12,7 @@ StrataPool.prototype = {
   abort: function(error) {
     if(this._aborting) return; // prevent reentrant abort() calls from retract / error handlers
     this._aborting = true;
-    c.each(this.strata, function(strata) { strata.abort(); });
+    c.each(this.strata, function(stratum) { if (stratum) stratum.abort(); });
     this.strata = [];
     if(error) {
       this.error.set(error);
