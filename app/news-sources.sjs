@@ -283,10 +283,39 @@ HackerNews.prototype = common.mergeSettings(newsFunctions, {
     this._super.reset.call(this);
   },
 
+  loadTimeout: 10 * 1000,
+
+  _fetchFrontPage: function() {
+    // attempt to fetch the front page news from multiple sources, since ihackernews is
+    // frequently down:
+    var sources = [
+      {url: 'http://localhost:7865/', delay: 0},
+      {url: 'http://api.ihackernews.com/page', delay: this.loadTimeout / 2},
+    ];
+
+    var pending = sources.length;
+    var load = function(source) {
+      try {
+        hold(source.delay);
+        return http.jsonp(source.url, {query: {format:'jsonp'}}).items;
+      } catch(e) {
+        pending -= 1;
+        if(pending > 0) {
+          // allow other stratum to succeed
+          hold();
+        } else {
+          // everything else already failed!
+          throw e;
+        }
+      }
+    };
+    return c.par.waitforFirst(load, sources, this);
+  },
+
   loadNewItems: function() {
     var date = new Date();
     this.about = "Hacker news links on " + dow[date.getDay()];
-    return http.jsonp('http://api.ihackernews.com/page', {query: {format:'jsonp'}}).items;
+    return this._fetchFrontPage();
   },
 
   processItem: function(item) {
