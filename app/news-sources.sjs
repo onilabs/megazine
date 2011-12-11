@@ -289,7 +289,7 @@ HackerNews.prototype = common.mergeSettings(newsFunctions, {
     // attempt to fetch the front page news from multiple sources, since ihackernews is
     // frequently down:
     var sources = [
-      {url: 'http://localhost:7865/', delay: 0},
+      {url: 'http://www.onilabs.com:7865/', delay: 0},
       {url: 'http://api.ihackernews.com/page', delay: this.loadTimeout / 2},
     ];
 
