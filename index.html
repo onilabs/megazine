@@ -105,7 +105,7 @@ try {
       <a class="tab rss active_{{news.type == 'add-rss'}}" href="#/rss/new"><strong>+</strong></a>
     </div>
     <div class="error" ng:show="news.pool.error.isSet">
-      Error: {{news.pool.error.value.message}}.<br />
+      Error: {{news.pool.error.value.toString()}}.<br />
       <button ng:click="news.rerun()">Continue&hellip;</button>
     </div>
     <!-- view is detemined by the current App route -->
