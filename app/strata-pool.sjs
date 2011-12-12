@@ -1,5 +1,6 @@
 var cutil = require("apollo:cutil");
 var c = require("apollo:collection");
+var logging = require("apollo:logging");
 
 var StrataPool = exports.StrataPool = function StrataPool() {
   this.error = new cutil.Condition();
@@ -65,7 +66,7 @@ StrataPool.prototype = {
   },
 
   _changed: function() {
-    console.log('change '+this.strata.length);
+    logging.debug('strata pool changed, now has {length} strata', this.strata);
     var self = this;
     this.size = this.strata.length;
     if(this.size == 0) {
