@@ -324,7 +324,22 @@ HackerNews.prototype = common.mergeSettings(newsFunctions, {
         }
       }
     };
-    return c.par.waitforFirst(load, sources, this);
+    while (1) {
+      try {
+        waitfor {
+          return c.par.waitforFirst(load, sources, this);
+        }
+        or {
+          hold(1000*60*2);
+          logging.warn("News requests timing out ");
+        }
+      }
+      catch (e) {
+        logging.warn("Error retrieving news: "+e);
+        // just retry in a bit; maybe should have backoff algo here
+        hold(1000*60);
+      }
+    }
   },
 
   loadNewItems: function() {
