@@ -64,13 +64,34 @@ Cache.prototype = {
     // seen so far in the current session
     var del_keys = [];
     var self = this;
-    this.db.each(function(item) {
-      var key = item.key;
-      var seen = key in self._seen && self._seen.hasOwnProperty(key);
-      if(!seen) {
-        del_keys.push(item.key);
+    try {
+      this.db.each(function(item) {
+        var key = item.key;
+        var seen = key in self._seen && self._seen.hasOwnProperty(key);
+        if(!seen) {
+          del_keys.push(item.key);
+        }
+      });
+    }
+    catch(e) {
+      // XXX There is some bug in lawnchair which sometimes gets the
+      // db into a bad state (keys there, but entries missing). This
+      // causes db.each() to throw. Best we can do for now is to remove
+      // the whole db:
+      logging.debug("lawnchair db is corrupt; deleting");
+      // XXX this.db.nuke() won't work; we'll assume DOM storage for now:
+      if (!window.localStorage) return;
+      try {
+        JSON.parse(window.localStorage[this.service+'._index_']).forEach(function(i) {
+          delete window.localStorage[i];
+        });
       }
-    });
+      catch (e) {
+        logging.debug("lawnchair db index is corrupt too.");
+      }
+      delete window.localStorage[this.service+'._index_'];
+      return;
+    }
     logging.debug("removing {len} keys from {service}", {len: del_keys.length, service: this.service}, del_keys);
     collection.par.each(del_keys, this.remove, this);
     waitfor(var items) { this.db.get(del_keys, resume); }
