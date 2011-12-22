@@ -153,11 +153,12 @@ var newsFunctions = {
   showArticle: function(article) {
     if(article.hidden) return;
     logging.info("Showing article: " + article, null, article);
-    // get the column with the smallest displyed height
+    // get the column with the smallest displayed height
     var columns = $('.col', this.$element);
     var columnHeights = columns.map(function() { return $(this).height() }).get();
     var minColumnHeight = Math.min.apply(Math, columnHeights);
     var minColumnIndex = columnHeights.indexOf(minColumnHeight);
+    console.log('columns:'+this.columns.length+' -- '+ minColumnIndex);
     this.columns[minColumnIndex][this.appendMethod](article);
   },
 
