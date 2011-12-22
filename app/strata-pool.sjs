@@ -65,7 +65,6 @@ StrataPool.prototype = {
   },
 
   _changed: function() {
-    console.log('change '+this.strata.length);
     var self = this;
     this.size = this.strata.length;
     if(this.size == 0) {
