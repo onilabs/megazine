@@ -24,35 +24,45 @@ App.$inject=['$route'];
 
 App.prototype.run = function() {
   this.feeds = this.feedStore.all();
-  var route = this.route;
   // every time the route changes, load the appropriate
   // news type (and abort the old news loader if there is one):
-  var currentStrata;
-  while (true) {
-    waitfor() { route.onChange(resume); }
-    if(currentStrata) {
-      currentStrata.abort();
-      currentStrata = null;
-    }
-    hold(0); // scope seems to be initialized right *after* this code, so we need a delay
+   while (true) {
+     waitfor {
+       var old = this.route;
+       waitfor() { this.route.onChange(resume); }
+     }
+     or {
+       this.runRoute();
+       hold();
+     }
+   };
+};
 
-    if(!(route.current && route.current.scope)) {
-      logging.debug("route changed with no current scope: ", null, route.current);
-      continue;
-    }
-    logging.debug("new route:", null, route.current);
+App.prototype.runRoute = function() {
+  // make sure scope is initialized:
+  hold(0);
+  
+  if (!this.route.current && this.route.current.scope) {
+    logging.debug("route changed with no current scope: ", null, this.route.current);
+    return;
+  }
+  logging.debug("new route:", null, this.route.current);
 
-    // init the scope, and run it in the background:
-    this.news = route.current.scope;
-
-    // for debugging
-    window.news = this.news;
-    this.$root.$eval();
-    if(this.news._init) {
+  // init the scope, and run it;
+  this.news = this.route.current.scope;
+  
+  // for debugging
+  window.news = this.news;
+  this.$root.$eval();
+  if(this.news._init) {
+    try {
       this.news._init();
-      currentStrata = spawn(this.news.run());
+      this.news.run();
     }
-  };
+    catch (e) { 
+      logging.error("route threw error: "+e);
+    } 
+  }
 };
 
 App.prototype.addFeed = function(url, name) {
