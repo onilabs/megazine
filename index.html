@@ -58,7 +58,10 @@ try {
       return common.supplant("{getHours}:{getMinutes}:{getSeconds}.{getMilliseconds}", now);
     });
     logging.setFormat("{time}|" + logging.getFormat());
-    require("apollo:debug").console({receivelog:false});
+    // require("apollo:debug").console({receivelog:true});
+  }
+  else {
+    logging.setLevel(logging.WARN);
   }
 
   var megazine = window.megazine = require('./app/megazine');
