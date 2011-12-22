@@ -150,16 +150,30 @@ var newsFunctions = {
     this.$root.$eval();
   },
 
+  getColumns: function() {
+    // XXX We need to check if the template for our view has been
+    // loaded. This is very hackish; Angular discourages accessing
+    // views from controllers.
+    var columns;
+    while (!(columns = $('.col', this.$element)).length) {
+      waitfor () {
+        this.$onEval(resume);
+      }
+    }
+    return columns;
+  },
+
   showArticle: function(article) {
     if(article.hidden) return;
     logging.info("Showing article: " + article, null, article);
     // get the column with the smallest displayed height
-    var columns = $('.col', this.$element);
+    var columns = this.getColumns();
     var columnHeights = columns.map(function() { return $(this).height() }).get();
     var minColumnHeight = Math.min.apply(Math, columnHeights);
     var minColumnIndex = columnHeights.indexOf(minColumnHeight);
-    console.log('columns:'+this.columns.length+' -- '+ minColumnIndex);
     this.columns[minColumnIndex][this.appendMethod](article);
+    // We need to redraw here, so that our height measurements are up to date:
+    this.redraw();
   },
 
   hideArticle: function(article, column) {
