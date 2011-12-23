@@ -42,7 +42,7 @@ App.prototype.runRoute = function() {
   // make sure scope is initialized:
   hold(0);
   
-  if (!this.route.current && this.route.current.scope) {
+  if (!this.route.current || !this.route.current.scope) {
     logging.debug("route changed with no current scope: ", null, this.route.current);
     return;
   }
