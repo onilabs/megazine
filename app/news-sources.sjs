@@ -65,12 +65,7 @@ var newsFunctions = {
         this.title = this.getTitle();
         var newItems;
         this.pool.run(function() {
-          try {
-            var items = this.loadNewItems();
-          } or {
-            hold(this.loadTimeout);
-            throw new Error(this.type + " items not received within " + Math.round(this.loadTimeout / 1000) + " seconds");
-          }
+          var items = this.loadNewItems();
           newItems = this.filterNewItems(items);
         }, this);
         this.processItems(newItems);
