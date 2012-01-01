@@ -111,7 +111,6 @@ var newsFunctions = {
     return newItems;
   },
 
-  // processArticle: function(id, url, user, text, pointerURL) {
   processArticle: function(opts) {
     var url = opts.url;
     if(!url) throw new Error("no URL given in article");
@@ -345,10 +344,11 @@ HackerNews.prototype = common.mergeSettings(newsFunctions, {
 
   processItem: function(item) {
     logging.debug("processing item: ",null, item);
-    var commentUrl = s("http://news.ycombinator.com/item?id={id}", item);
+    var hn_base = 'http://news.ycombinator.com';
+    var commentUrl = s(hn_base + "/item?id={id}", item);
     this.processArticle({
       id: item.id,
-      url: item.url,
+      url: http.canonicalizeURL(item.url, hn_base),
       user: item.postedBy,
       text: item.title,
       pointerURL: commentUrl
