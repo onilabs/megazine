@@ -14,7 +14,6 @@ var App = exports.App = function App(route) {
   this.route = route;
   this.feeds = [];
   this.feedStore = new Cache("rss_feeds");
-  route.when('/twitter', {controller: NewsSources.Twitter, template: "templates/twitter.html"});
   route.when('/hackernews', {controller: NewsSources.HackerNews, template: "templates/basic-news.html"});
   route.when('/rss/new', {controller: RssAdder(this), template: "templates/add-rss.html"});
   route.when('/rss/:feed', {controller: NewsSources.RSS, template: "templates/basic-news.html"});

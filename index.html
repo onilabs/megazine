@@ -45,10 +45,6 @@ try {
       ], require);
   }
   var common = require("apollo:common");
-  var Twitter = require("./app/news-sources").Twitter;
-
-  // replace with your own application id:
-  Twitter.prototype.appId = "JamxhlnS3WsCrdzQMblw";
 
   var logging = require("apollo:logging");
   if(document.location.host.indexOf('127.0.0.1') !== -1 || document.location.host.indexOf('localhost') !== -1) {
@@ -69,13 +65,6 @@ try {
   angular.compile(document)();
   if(document.location.hash == '') {
     document.location.hash = '#/hackernews';
-  } else if(document.location.hash.indexOf("oauth") !== -1) {
-    // twitter oauth callback doesn't go to #/twitter, but
-    // we need the twitter controller to run in order to
-    // process the response
-    var twitter = new Twitter();
-    twitter._init();
-    twitter.awaitAuth();
   };
 
 } catch (e) {
@@ -98,7 +87,6 @@ try {
     <h3 id="unprocessedItems" style="display:none;" ng:show="news.pool.size"><div class="spinner"></div>loading {{news.pool.size}} items</h3>
     <div class="tabbar" ng:show="news">
       <a class="tab hackernews active_{{news.type == 'hackernews'}}" href="#/hackernews">hacker news</a>
-      <a class="tab twitter active_{{news.type == 'twitter'}}" href="#/twitter">your twitter</a>
       <span ng:repeat="feed in feeds">
         <!-- TODO: fix double-encoding requirement -->
         <span class="tab rss active_{{route.current.params.feed == (feed.url | escapeURI)}}">

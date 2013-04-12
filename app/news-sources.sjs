@@ -15,7 +15,7 @@ var StrataPool = require('./strata-pool').StrataPool;
 var dow = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
 var newsFunctions = {
-  // methods common across all news sources (twitter, hackernews, ...)
+  // methods common across all news sources
   reset: function() {
     this.pool.reset();
     var self = this;
@@ -183,104 +183,6 @@ var newsFunctions = {
   }
 
 };
-
-var Twitter = exports.Twitter = function Twitter() {};
-Twitter.anywhere = null;
-Twitter.prototype = common.mergeSettings(newsFunctions, {
-  _super: newsFunctions,
-  type:'twitter',
-
-  _init: function() {
-    logging.info("twitter initializing");
-    this._super._init.call(this);
-    this.pool.run(function() {
-      if(!Twitter.anywhere) {
-        Twitter.anywhere = require("apollo:twitter").initAnywhere({id:this.appId});
-      }
-      this.twitter = Twitter.anywhere;
-      this.twitter("#login").connectButton();
-    }, this);
-    this.url_cache = new Cache("twitter_urls");
-  },
-  reset: function() {
-    this.columns = [[],[],[]];
-    this.signoutEvent = new cutil.Condition();
-    this.linklessTweets = [];
-    this.connected = false;
-    this._super.reset.call(this);
-  },
-
-  loadNewItems: function() {
-    var date = new Date();
-    var user = this.twitter.call("users/show", {user_id: this.twitter.currentUser.id});
-    this.about = "The twitter links of " + user.name + " on " + dow[date.getDay()];
-
-    waitfor (var tweets) { this.twitter.User.current().homeTimeline(resume); }
-    return tweets.array;
-  },
-
-  awaitAuth: function() {
-    this.connected = this.twitter.isConnected();
-    this.redraw();
-    // wait until we're connected:
-    if (!this.connected) this.twitter.waitforEvent("authComplete");
-    this.connected = true;
-  },
-
-  run: function() {
-    // override _super.run() to ensure we're connected first
-    while(true) {
-      this.awaitAuth();
-      this.redraw();
-      waitfor {
-        this._super.run.call(this);
-      } or {
-        this.signoutEvent.wait();
-        collapse;
-        twttr.anywhere.signOut();
-        this.reset();
-      }
-    }
-  },
-
-  triggerSignout: function() {
-    this.signoutEvent.set();
-  },
-
-  processItem: function(tweet) {
-    logging.debug("processing tweet: ",null, tweet);
-    var link = /(https?:\/\/[^ ]+)/g;
-    var links = tweet.text.match(link);
-    tweet.name = tweet.user.name;
-
-    // strange that twitter doesn't provide this...
-    tweet.url = s("http://twitter.com/#!/{user}/status/{id}",
-      {user:tweet.user.screenName, id:tweet.idStr});
-    
-    if(!(links && links.length)) {
-      this.linklessTweets[this.appendMethod](tweet);
-      return;
-    }
-
-    var url = links[0];
-
-    // expand URL if needed
-    url = Content.getExpandedURL(url, this.url_cache);
-    
-    this.processArticle({
-      id: tweet.id,
-      url: url,
-      user: tweet.user.name,
-      text: tweet.text,
-      pointerURL: tweet.url
-    });
-  },
-
-  flush_cache: function() {
-    this._super.flush_cache.call(this);
-    this.url_cache.flush();
-  }
-});
 
 var HackerNews = exports.HackerNews = function HackerNews() {}
 HackerNews.prototype = common.mergeSettings(newsFunctions, {
