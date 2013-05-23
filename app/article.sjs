@@ -1,6 +1,6 @@
 var Content = require("./content-extraction");
-var logging = require("apollo:logging");
-var s = require("apollo:common").supplant;
+var logging = require("sjs:logging");
+var {supplant:s} = require("sjs:string");
 var underscore = require("../lib/underscore.js");
 
 // -------------------- Article object --------------------
@@ -50,7 +50,7 @@ Article.prototype.update = function(opts) {
 Article.prototype.userList = function() { return this.users.join(", "); };
 
 Article.prototype.loadContent = function() {
-  logging.debug("Processing article: {url}", this);
+  logging.debug("Processing article: #{this.url}");
   this.heading = {};
 
   var contents = Content.getURLContents.rateLimited(this.url);
@@ -60,7 +60,7 @@ Article.prototype.loadContent = function() {
     this.heading.text = this.url;
     return;
   }
-  logging.debug("got article contents for {url}:", this, contents);
+  logging.debug("got article contents for #{this.url}:", contents);
 
   if(this.contentOverrides.title) contents.title = this.contentOverrides.title;
   

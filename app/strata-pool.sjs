@@ -1,6 +1,7 @@
-var cutil = require("apollo:cutil");
-var c = require("apollo:collection");
-var logging = require("apollo:logging");
+var cutil = require("sjs:cutil");
+var array = require('sjs:array');
+var seq = require('sjs:sequence');
+var logging = require("sjs:logging");
 
 var StrataPool = exports.StrataPool = function StrataPool() {
   this.error = new cutil.Condition();
@@ -13,7 +14,7 @@ StrataPool.prototype = {
   abort: function(error) {
     if(this._aborting) return; // prevent reentrant abort() calls from retract / error handlers
     this._aborting = true;
-    c.each(this.strata, function(stratum) { if (stratum) stratum.abort(); });
+    this.strata .. seq.filter(x -> x) .. seq.each {|stratum| stratum.abort(); };
     this.strata = [];
     if(error) {
       this.error.set(error);
@@ -50,7 +51,7 @@ StrataPool.prototype = {
       } catch(e) {
         err = e;
       } finally {
-        c.remove(this.strata, stratum);
+        this.strata .. array.remove(stratum);
         this._changed();
         if(err !== undefined) {
           this.abort(err);
@@ -66,7 +67,7 @@ StrataPool.prototype = {
   },
 
   _changed: function() {
-    logging.debug('strata pool changed, now has {length} strata', this.strata);
+    logging.debug("strata pool changed, now has #{this.strata.length} strata");
     var self = this;
     this.size = this.strata.length;
     if(this.size == 0) {

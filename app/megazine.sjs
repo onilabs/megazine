@@ -1,12 +1,11 @@
-require("apollo:jquery-binding").install();
-var logging = require("apollo:logging");
+var logging = require("sjs:logging");
 var Cache = require("./cache.sjs").Cache;
 
 var NewsSources = require('./news-sources');
 
 if(logging.isEnabled(logging.VERBOSE)) {
   // in debug mode, pop up an apollo console
-  require("apollo:debug").console({receivelog:false});
+  require("sjs:xbrowser/console").console({receivelog:false});
 }
 
 // The main app controller, initialized by angular.js
@@ -42,10 +41,10 @@ App.prototype.runRoute = function() {
   hold(0);
   
   if (!this.route.current || !this.route.current.scope) {
-    logging.debug("route changed with no current scope: ", null, this.route.current);
+    logging.debug("route changed with no current scope: ", this.route.current);
     return;
   }
-  logging.debug("new route:", null, this.route.current);
+  logging.debug("new route:", this.route.current);
 
   // init the scope, and run it;
   this.news = this.route.current.scope;
@@ -58,9 +57,9 @@ App.prototype.runRoute = function() {
       this.news._init();
       this.news.run();
     }
-    catch (e) { 
+    catch (e) {
       logging.error("route threw error: "+e);
-    } 
+    }
   }
 };
 

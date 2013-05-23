@@ -1,9 +1,12 @@
-var cutil = require('apollo:cutil');
-var c = require('apollo:collection');
-var logging = require('apollo:logging');
-var yql = require('apollo:yql');
-var http = require('apollo:http');
-var s = require("apollo:common").supplant;
+var cutil = require('sjs:cutil');
+var seq = require('sjs:sequence');
+var logging = require('sjs:logging');
+var yql = require('sjs:webapi/yql');
+var http = require('sjs:http');
+var Url = require('sjs:url');
+var s = require("sjs:string").supplant;
+var func = require('sjs:function');
+var array = require('sjs:array');
 
 var underscore = require("../lib/underscore.js");
 var Cache = require('./cache').Cache;
@@ -13,7 +16,7 @@ var imgServiceDomains = ["twitpic.com", "yfrog.com", "imgur.com"];
 
 // attach a rate limited version of `fn` to `fn.rateLimited`
 function rateLimit(fn, rate) {
-  fn.rateLimited = cutil.makeRateLimitedFunction(fn, rate);
+  fn.rateLimited = func.rateLimit(fn, rate);
 };
 
 var getExpandedURL = exports.getExpandedURL = function(url, cache) {
@@ -46,10 +49,7 @@ var getURLContents = exports.getURLContents = function getURLContents(url) {
     xpath:xpath
   }));
 
-  logging.debug("querying article {url} with xpath {xpath} returns:", {
-    url: url,
-    xpath: xpath},
-    result.results);
+  logging.debug("querying article #{url} with xpath #{xpath} returns:", result.results);
 
   return result.results;
 };
@@ -75,45 +75,37 @@ var extractImage = exports.extractImage = function extractImage(page, url) {
 function getBestImage(images, baseURL) {
   // remove src-less images
   var seenSources = [];
-  images = c.filter(images, function(img) {
-    if(!img.src || underscore.include(seenSources, img.src)) {
-      return false;
-    }
-    seenSources.push(img.src);
-    return img.src;
-  });
+  images = images .. seq.filter(function(img) {
+    return (img.src && !underscore.include(seenSources, img.src));
+  }) .. seq.toArray();
 
-  c.par.each(images, function(img) {
-    img.src = http.canonicalizeURL(img.src, baseURL);
+  seenSources = seenSources.concat(images);
+
+  images .. seq.parallelize .. seq.each {|img|
+    img.src = Url.normalize(img.src, baseURL);
     guessImageSize(img);
-  });
+  }
 
   // filter out images < 140px; we never want to display them
-  images = c.filter(images, function(img) {
-    return (img.width === undefined) || (img.width > 140);
-  });
-  images.sort(imageCompare);
+  images = images .. seq.filter((img) -> (img.width === undefined) || (img.width > 140));
+  images = images .. seq.sort(imageCompare);
 
   if(images.length == 0) return null;
-  logging.debug("images (worst to best) = ", null, images);
+  logging.debug("images (worst to best) = ", images);
 
-  var best_img = images[images.length-1];
+  var best_img = images .. seq.at(-1);
   return new ArticleImage(best_img.src, isImageService(baseURL));
 };
 
 function imageCompare(a, b) {
-  var criteria = function(img) {
+  var attrs = function(img) {
     var isJpeg = img.src.match(/\.jpe?g/);
     var width = img.width ? img.width : 0;
     var height = img.height ? img.height : 100;
-    // isJpeg trumps width, jpegs are less likely page decoration
+    // isJpeg trumps size, jpegs are less likely page decoration
     return [isJpeg ? 1 : 0, width * height];
   }
-
-  var ca = criteria(a);
-  var cb = criteria(b);
-  if(ca[0]!=cb[0]) return ca[0] - cb[0];
-  return ca[1] - cb[1];
+  return array.cmp(attrs(a), attrs(b));
 };
 
 function guessImageSize(img) {
@@ -124,7 +116,7 @@ function guessImageSize(img) {
   var styleRe = /(?:^|[^-])width: *(\d+)px/;
   match = (img.style && img.style.match(styleRe));
   if(match) {
-    logging.debug("guessed image width of " + match[1] + " based on style string: " + img.style + " for url " + img.src, null, match);
+    logging.debug("guessed image width of #{match[1]} based on style string: #{img.style} for url #{img.src}", match);
     img.width = parseInt(match[1]);
     img.height = img.width; // not correct, but roughly accurate
     return;
@@ -134,7 +126,7 @@ function guessImageSize(img) {
   var sizeRe = /(?:x|w|xsize|size|width)=(\d+)/;
   match = img.src.match(sizeRe);
   if(match) {
-    logging.debug("guessed image width of " + match[1] + " based on url: " + img.src);
+    logging.debug("guessed image width of #{match[1]} based on url: #{img.src}");
     img.width = parseInt(match[1]);
     img.height = img.width; // not correct, but roughly accurate
     return;
@@ -146,18 +138,18 @@ function guessImageSize(img) {
     img.width = loaded.width;
     img.width = loaded.height;
   } catch (e) {
-    logging.debug("failed to load image: " + e);
+    logging.debug("failed to load image: #{e}");
   }
 };
 
-var loadImage = exports.loadImage = cutil.makeMemoizedFunction(function(url, timeout) {
+var loadImage = exports.loadImage = func.memoize(function(url, timeout) {
   var domImg = new Image();
   timeout = timeout || 5;
   try {
     waitfor() {
       domImg.onload = resume;
     }
-    logging.debug("loaded image {src} to find that its width is {width}", domImg);
+    logging.debug("loaded image #{domImg.src} to find that its width is #{domImg.width}");
     return domImg;
   } or {
     domImg.src=url;
@@ -168,7 +160,7 @@ var loadImage = exports.loadImage = cutil.makeMemoizedFunction(function(url, tim
 
 
 function isImageService(url) {
-  var domain = http.parseURL(url).authority;
+  var domain = Url.parse(url).authority;
   domain = domain.replace(/^wwww\./, ''); // strip leading www
   return imgServiceDomains.indexOf(domain) !== -1;
 };

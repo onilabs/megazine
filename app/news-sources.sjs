@@ -1,9 +1,10 @@
-var logging = require("apollo:logging");
-var c = require('apollo:collection');
-var cutil = require("apollo:cutil");
-var common = require("apollo:common");
-var s = common.supplant;
-var http = require("apollo:http");
+var logging = require("sjs:logging");
+var seq = require('sjs:sequence');
+var cutil = require("sjs:cutil");
+var {supplant:s} = require("sjs:string");
+var object = require('sjs:object');
+var http = require("sjs:http");
+var url = require("sjs:url");
 
 var Article = require('article').Article;
 
@@ -40,12 +41,12 @@ var newsFunctions = {
   processItems: function(items) {
     // process each item, wrapped in the strata pool to show
     // the number of pending items in the UI
-    c.par.map(items, function(item) {
+    items .. seq.parallelize .. seq.each {|item|
       this.pool.run(function() {
         this.processItem(item);
         this.items.push(item);
       }, this);
-    }, this);
+    }
     this.flush_cache();
   },
 
@@ -97,17 +98,17 @@ var newsFunctions = {
     var existingItems = this.items;
     var existingIds = underscore.pluck(existingItems, idProp);
     var newIds = [];
-    c.each(newItems, function(item) {
+    newItems .. seq.each {|item|
       var id = item[idProp];
       if(!id) {
-        logging.warn("encountered item without ID - ignoring", null, item);
+        logging.warn("encountered item without ID - ignoring", item);
       } else {
         newIds.push(id);
       }
-    });
+    };
 
     newIds = underscore.difference(newIds, existingIds);
-    newItems = underscore.select(newItems, function(t) { return underscore.include(newIds, t[idProp]); });
+    newItems = underscore.select(newItems, (t) -> underscore.include(newIds, t[idProp]));
     return newItems;
   },
 
@@ -119,7 +120,7 @@ var newsFunctions = {
       // create and load in two steps, since the load step is blocking
       // and we want to make sure this.articles[url] is set immediately
       var article = this.articles[url] = new Article(opts);
-      logging.debug("getting article", null, article);
+      logging.debug("getting article", article);
       var cached = this.cache.get(article.key);
       if(cached) {
         logging.verbose("using cached article for URL " + url);
@@ -138,7 +139,7 @@ var newsFunctions = {
   redraw: function() {
     if(!this.$root) {
       // XXX why does this happen?
-      logging.warn("redraw() called while $root is undefined", null, this);
+      logging.warn("redraw() called while $root is undefined", this);
       return;
     }
     this.$root.$eval();
@@ -159,7 +160,7 @@ var newsFunctions = {
 
   showArticle: function(article) {
     if(article.hidden) return;
-    logging.info("Showing article: " + article, null, article);
+    logging.info("Showing article: ", article);
     // get the column with the smallest displayed height
     var columns = this.getColumns();
     var columnHeights = columns.map(function() { return $(this).height() }).get();
@@ -171,7 +172,7 @@ var newsFunctions = {
   },
 
   hideArticle: function(article, column) {
-    logging.debug("hiding article: ", null, article);
+    logging.debug("hiding article: ", article);
     this.pool.add(function() {
       article.hidden = true;
       try {
@@ -185,7 +186,7 @@ var newsFunctions = {
 };
 
 var HackerNews = exports.HackerNews = function HackerNews() {}
-HackerNews.prototype = common.mergeSettings(newsFunctions, {
+HackerNews.prototype = object.merge(newsFunctions, {
   _super: newsFunctions,
   type: 'hackernews',
 
@@ -223,7 +224,7 @@ HackerNews.prototype = common.mergeSettings(newsFunctions, {
     while (1) {
       try {
         waitfor {
-          return c.par.waitforFirst(load, sources, this);
+          return cutil.waitforFirst(load, sources, this);
         }
         or {
           hold(1000*60*2);
@@ -245,12 +246,12 @@ HackerNews.prototype = common.mergeSettings(newsFunctions, {
   },
 
   processItem: function(item) {
-    logging.debug("processing item: ",null, item);
+    logging.debug("processing item: ",item);
     var hn_base = 'http://news.ycombinator.com';
     var commentUrl = s(hn_base + "/item?id={id}", item);
     this.processArticle({
       id: item.id,
-      url: http.canonicalizeURL(item.url, hn_base),
+      url: url.normalize(item.url, hn_base),
       user: item.postedBy,
       text: item.title,
       pointerURL: commentUrl
@@ -264,9 +265,9 @@ var RSS = exports.RSS = function RSS(route) {
   this.type = 'rss:' + url;
 };
 RSS.$inject = ['$route'];
-var yql = require('apollo:yql');
+var yql = require('sjs:webapi/yql');
 
-RSS.prototype = common.mergeSettings(newsFunctions, {
+RSS.prototype = object.merge(newsFunctions, {
   _super: newsFunctions,
   reset: function() {
     this.columns = [[],[],[],[]];
@@ -276,7 +277,7 @@ RSS.prototype = common.mergeSettings(newsFunctions, {
     var rv = yql.query("select * from feednormalizer where url = @url and output='atom_1.0'", {
       url: this.url
     });
-    logging.info("RSS feed entries: ",null, rv);
+    logging.info("RSS feed entries: ",rv);
     this.about = "Latest articles from \"" + rv.results.feed.title + "\" on " + dow[new Date().getDay()];
     var entries = rv.results.feed.entry;
     if(!entries) throw new Error("No entries found for feed " + this.url);
@@ -284,7 +285,7 @@ RSS.prototype = common.mergeSettings(newsFunctions, {
   },
 
   processItem: function(item) {
-    logging.debug("processing feed entry: ", null, item);
+    logging.debug("processing feed entry: ", item);
     var content = null;
     if(item.summary && item.summary.content) content = item.summary.content;
     if(item.content && item.content.content) content = item.content.content;

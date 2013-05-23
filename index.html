@@ -8,14 +8,14 @@
 <meta name="viewport" content="initial-scale = 1.0,maximum-scale = 1.0,width=device-width" />
 <link href='http://fonts.googleapis.com/css?family=Vollkorn' rel='stylesheet' type='text/css'>
 
+<script src="lib/jquery-1.9.1.min.js"></script>
 <script src="lib/lawnchair-0.6.1.min.js"></script>
 <script src="lib/angular-0.9.19.min.js"></script>
 
-<script src="http://code.onilabs.com/apollo/0.13/oni-apollo.js"></script>
+<script src="http://code.onilabs.com/apollo/mho/oni-apollo.js"></script>
 <script type="text/sjs">
 try {
   try {
-    require("apollo:jquery-binding").install();
     // install spinners in the background, as they're less important than actually loading
     spawn((function() {
       require("./lib/spin.min.js");
@@ -31,30 +31,36 @@ try {
     })());
   } and {
     // we're going to need all of these - might as well pre-fetch them in parallel
-    require("apollo:collection").par.map([
-      "apollo:common",
-      "apollo:yql",
-      "apollo:logging",
+    var seq = require("sjs:sequence");
+    seq.parallelize([
+      "sjs:string",
+      "sjs:xbrowser/webapi/yql",
+      "sjs:logging",
+      "sjs:http",
+      "sjs:sequence",
+      "sjs:array",
+      "sjs:url",
+      "sjs:object",
+      "sjs:cutil",
       "./lib/underscore.js",
-      "apollo:http",
       "./app/news-sources",
       "./app/content-extraction",
       "./app/article",
       "./app/megazine",
       "./app/cache"
-      ], require);
+      ]) .. seq.map(require);
   }
-  var common = require("apollo:common");
+  var string = require('sjs:string');
+  // var common = require("apollo:common");
 
-  var logging = require("apollo:logging");
+  var logging = require("sjs:logging");
   if(document.location.host.indexOf('127.0.0.1') !== -1 || document.location.host.indexOf('localhost') !== -1) {
     logging.setLevel(logging.DEBUG);
-    logging.defineField('time', function() {
+    logging.setFormatter(function(rec) {
       var now = new Date();
-      return common.supplant("{getHours}:{getMinutes}:{getSeconds}.{getMilliseconds}", now);
+      var nowStr = string.supplant("{getHours}:{getMinutes}:{getSeconds}.{getMilliseconds}", now);
+      return [nowStr + "|" + rec.level + ":"].concat(rec.args);
     });
-    logging.setFormat("{time}|" + logging.getFormat());
-    // require("apollo:debug").console({receivelog:true});
   }
   else {
     logging.setLevel(logging.WARN);

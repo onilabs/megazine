@@ -1,6 +1,5 @@
-var logging = require("apollo:logging");
-var common = require("apollo:common");
-var collection = require("apollo:collection");
+var logging = require("sjs:logging");
+var seq = require("sjs:sequence");
 
 // increment VERSION when changing data model
 var VERSION = 1;
@@ -26,11 +25,7 @@ Cache.prototype = {
     waitfor(var obj) {
       this.db.get(key, resume);
     }
-    logging.debug("cache {status}: {key} [{name}]", {
-      status: obj ? 'HIT' : 'MISS',
-      key: key,
-      name: this.service
-    });
+    logging.debug("cache #{obj ? 'HIT' : 'MISS'}: #{key} [#{this.service}]");
     if (!obj || obj._DB_VERSION != VERSION) return null;
     this._keep(obj);
     return obj;
@@ -49,7 +44,7 @@ Cache.prototype = {
       throw new Error("item persisted to " + this.service + " cache without a key: " + JSON.stringify(obj));
     }
     if(key.toString() !== key) {
-      logging.warn("non-string key in DB: " + JSON.stringify(key));
+      logging.warn("non-string key in DB: ", key);
       obj.key = key.toString();
     }
     this._seen[key] = true;
@@ -92,13 +87,11 @@ Cache.prototype = {
       delete window.localStorage[this.service+'._index_'];
       return;
     }
-    logging.debug("removing {len} keys from {service}", {len: del_keys.length, service: this.service}, del_keys);
-    collection.par.each(del_keys, this.remove, this);
+    logging.debug("removing #{del_keys.length} keys from #{this.service}:", del_keys);
+    seq.parallelize(del_keys) .. seq.map(this.remove.bind(this));
     waitfor(var items) { this.db.get(del_keys, resume); }
     if(items.length > 0) {
-      logging.error("{length} cache items did not get deleted from collection {service}:" , {
-        length: items.length,
-        service: this.service}, items);
+      logging.error("#{items.length} cache items did not get deleted from collection #{this.service}:", items);
     }
   }
 };
