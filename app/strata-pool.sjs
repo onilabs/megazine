@@ -1,11 +1,12 @@
 var cutil = require("sjs:cutil");
+var events = require("sjs:events");
 var array = require('sjs:array');
 var seq = require('sjs:sequence');
 var logging = require("sjs:logging");
 
 var StrataPool = exports.StrataPool = function StrataPool() {
   this.error = new cutil.Condition();
-  this.change = new cutil.Event();
+  this.change = new events.Emitter();
   this.empty = new cutil.Condition();
   this.reset();
 };
@@ -14,11 +15,11 @@ StrataPool.prototype = {
   abort: function(error) {
     if(this._aborting) return; // prevent reentrant abort() calls from retract / error handlers
     this._aborting = true;
-    this.strata .. seq.filter(x -> x) .. seq.each {|stratum| stratum.abort(); };
-    this.strata = [];
     if(error) {
       this.error.set(error);
     }
+    this.strata .. seq.filter(x -> x) .. seq.each {|stratum| stratum.abort(); };
+    this.strata = [];
     this._aborting = false;
     this._changed();
   },
@@ -49,6 +50,7 @@ StrataPool.prototype = {
         result = fn.call(_this);
         if(cb) { cb.call(_this, result); }
       } catch(e) {
+        logging.error("Strata error: #{e}");
         err = e;
       } finally {
         this.strata .. array.remove(stratum);
