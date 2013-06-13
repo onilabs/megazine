@@ -249,9 +249,12 @@ HackerNews.prototype = object.merge(newsFunctions, {
     logging.debug("processing item: ",item);
     var hn_base = 'http://news.ycombinator.com';
     var commentUrl = s(hn_base + "/item?id={id}", item);
+    var itemUrl = item.url;
+    // XXX remove this hack once ihackernews API stops html-encoding their URLs!
+    itemUrl = resolveHtmlEntities(itemUrl);
     this.processArticle({
       id: item.id,
-      url: url.normalize(item.url, hn_base),
+      url: url.normalize(itemUrl, hn_base),
       user: item.postedBy,
       text: item.title,
       pointerURL: commentUrl
@@ -297,3 +300,10 @@ RSS.prototype = object.merge(newsFunctions, {
     });
   }
 });
+
+function resolveHtmlEntities(html) {
+  // textarea ensures entities get interpreted, but *not* tags (that would allow XSS)
+  var txt = document.createElement("textarea");
+  txt.innerHTML = html;
+  return txt.value;
+}
