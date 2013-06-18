@@ -41,7 +41,7 @@ var newsFunctions = {
   processItems: function(items) {
     // process each item, wrapped in the strata pool to show
     // the number of pending items in the UI
-    items .. seq.parallelize .. seq.each {|item|
+    items .. seq.each.par {|item|
       this.pool.run(function() {
         this.processItem(item);
         this.items.push(item);
@@ -268,7 +268,7 @@ var RSS = exports.RSS = function RSS(route) {
   this.type = 'rss:' + url;
 };
 RSS.$inject = ['$route'];
-var yql = require('sjs:webapi/yql');
+var yql = require('github:onilabs/sjs-webapi/master/yql');
 
 RSS.prototype = object.merge(newsFunctions, {
   _super: newsFunctions,

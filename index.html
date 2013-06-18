@@ -32,9 +32,9 @@ try {
   } and {
     // we're going to need all of these - might as well pre-fetch them in parallel
     var seq = require("sjs:sequence");
-    seq.parallelize([
+    [
+      "github:onilabs/sjs-webapi/master/yql",
       "sjs:string",
-      "sjs:webapi/yql",
       "sjs:logging",
       "sjs:http",
       "sjs:sequence",
@@ -48,7 +48,7 @@ try {
       "./app/article",
       "./app/megazine",
       "./app/cache"
-      ]) .. seq.map(require);
+    ] .. seq.each.par(require);
   }
   var string = require('sjs:string');
   // var common = require("apollo:common");

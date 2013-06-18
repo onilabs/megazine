@@ -1,7 +1,7 @@
 var cutil = require('sjs:cutil');
 var seq = require('sjs:sequence');
 var logging = require('sjs:logging');
-var yql = require('sjs:webapi/yql');
+var yql = require('github:onilabs/sjs-webapi/master/yql');
 var http = require('sjs:http');
 var Url = require('sjs:url');
 var s = require("sjs:string").supplant;
@@ -81,7 +81,7 @@ function getBestImage(images, baseURL) {
 
   seenSources = seenSources.concat(images);
 
-  images .. seq.parallelize .. seq.each {|img|
+  images .. seq.each.par {|img|
     img.src = Url.normalize(img.src, baseURL);
     guessImageSize(img);
   }
